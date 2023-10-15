@@ -1,5 +1,5 @@
 var groups = {
-    "theCityAndtheCity": {
+    "archiGrad": {
         "Anan MA": [
             "./extra/week_1.png",
             "content/group_A/Anan MA/week_1/processed/2_pr.png",

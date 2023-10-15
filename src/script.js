@@ -45,7 +45,7 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enablePan = true;
 controls.enableRotate = true;
 
-const projectName = "theCityAndtheCity"  // name of the project ansd also the name of the html file that is loaded up
+const projectName = "archiGrad"  // name of the project ansd also the name of the html file that is loaded up
 
 let zoomLevel = 1.0; // Initial zoom level
 const zoomIncrement = 0.2;
@@ -554,7 +554,7 @@ for (var group in groups) {
         createStacksOfPlanes(students);
     });
 
-    // Check if the current button is "theCityAndtheCity" and underline it on startup
+    // Check if the current button is "archiGrad" and underline it on startup
     if (group === projectName) {
         groupButton.style.textDecoration = "underline";
         // groupButton.style.fontWeight = "bold";

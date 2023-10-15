@@ -306,7 +306,7 @@ else:
 
 
 groups = {}
-groups["theCityAndtheCity"] = {} #make the full theCityAndtheCity
+groups["archiGrad"] = {} #make the full archiGrad
 weeksHTML = {}
 
 
@@ -410,8 +410,8 @@ for group in sorted(os.listdir("content")):
                 all_content = [item for sublist in weeks for item in sublist]  # Flatten the week lists
                 groups[group][student] = all_content
 
-                # create theCityAndtheCity dict
-                groups["theCityAndtheCity"][student] = all_content
+                # create archiGrad dict
+                groups["archiGrad"][student] = all_content
                 # generate html files for students
                 generate_html_file(f"info/{student.replace(' ', '_')}.html", student.replace(' ', '_'), False, weekArray, textArray, imgArray, group)
 
