@@ -80,8 +80,8 @@ function createStacksOfPlanes(students) {
 var imageWidth = 100
 
 
-const verses = ['bricks layed', 'stacks stacked','images rendered','blocks build','cities build','images curated']
-const randomVerses = verses[Math.floor(Math.random() * verses.length)]
+// const verses = ['bricks layed', 'stacks stacked','images rendered','blocks build','cities build','images curated']
+// const randomVerses = verses[Math.floor(Math.random() * verses.length)]
 // make a loading screen function
 
 
@@ -106,7 +106,7 @@ function loadImagesAsync(imageUrls) {
                 }
                 
                 // let loadingAnimationContent =  '<img id="loading" src="loading.gif"></img>' 
-                screenDiv.innerHTML ='building city <br>' + (loadedCount-1) + '/' + (allImageUrls-1)  + '<br>' +screenDivContent + '<br>' + ((loadedCount-1)/(allImageUrls-1)*100) + '%'
+                screenDiv.innerHTML ='compiling designs <br>' + (loadedCount-1) + '/' + (allImageUrls-1)  + '<br>' +screenDivContent + '<br>' + ((loadedCount-1)/(allImageUrls-1)*100) + '%'
 
                 if (loadedCount === allImageUrls) {
                     resolve(loadedTextures);

@@ -1,0 +1,7 @@
+trying some things
+
+<iframe src="//player.bilibili.com/player.html?aid=51192849&bvid=BV114411x7Rj&cid=89624264&page=1" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"> </iframe>
+
+<iframe width="560" height="315" src="https://www.youtube.com/embed/UXtuigy_wYc?si=QQ3lgLXTjXb_1HUJ" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+
+<iframe src="https://www.youtube.com/embed/UXtuigy_wYc?si=QQ3lgLXTjXb_1HUJ" scrolling="no" border="0" frameborder="no" framespacing="0" allowfullscreen="true"> </iframe>
