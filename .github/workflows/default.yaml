@@ -43,6 +43,6 @@ jobs:
         with:
           target_branch: gh-pages
           build_dir: src
-          fqdn: archigrad.io
+          # fqdn: archigrad.io
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
