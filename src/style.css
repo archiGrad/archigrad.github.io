@@ -45,8 +45,8 @@ img .tag{z-index: 10;}
 
 .you {
   float: left;
-  background-color: rgb(255, 255, 255);
-  color: rgb(0, 0, 0);
+  background-color: rgb(19, 19, 19);
+  color: rgb(220, 220, 220);
   font-size: 0.5em;
   border-radius: 5px 5px 5px 5px;
   margin: 1px;
@@ -59,8 +59,9 @@ img .tag{z-index: 10;}
 }
 .lexicon {
   float: left;
-  background-color: rgb(255, 255, 255);
-  color: rgb(0, 0, 0);
+  /* border: 10px solid olive; */
+  background-color: rgb(0, 0, 232);
+  color: rgb(255, 255, 255);
   font-size: 0.5em;
   border-radius: 5px 5px 5px 5px;
   margin: 1px;

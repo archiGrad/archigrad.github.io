@@ -11,7 +11,7 @@ var headerDiv = document.getElementById("header");
 
 // Create an orthographic camera with adjusted frustum size
 // const zoomFactor = 60; // Adjust this value to control the zoom level
-const zoomFactor = Math.ceil(Math.random() * 50) + 10; // Generates a random value between 10 and 60
+const zoomFactor = Math.ceil(Math.random() * 10) + 2; // Generates a random value between 10 and 60
 const frustumSize = 30 / zoomFactor;
 const camera = new THREE.OrthographicCamera(
     frustumSize / -2,
@@ -42,8 +42,8 @@ scene.add(cube);
 
 const controls = new OrbitControls(camera, renderer.domElement);
 // controls.rotateSpeed = 0.2;
-controls.enableDamping = true;
-controls.dampingFactor = 0.01;
+// controls.enableDamping = true;
+// controls.dampingFactor = 0.1;
 
 const projectName = "archiGrad" 
 var planesByStack = []
@@ -308,9 +308,9 @@ function createStacksOfPlanes(students) {
 
 
             // create textboxes 
-            let conversationKeys = Object.keys(conversations);
-            let randomConversationKey = conversationKeys[Math.floor(Math.random() * conversationKeys.length)];
-            let randomConversation = conversations[randomConversationKey];
+            // let conversationKeys = Object.keys(conversations);
+            // let randomConversationKey = conversationKeys[Math.floor(Math.random() * conversationKeys.length)];
+            // let randomConversation = conversations[randomConversationKey];
 
    
             
@@ -322,7 +322,6 @@ function createStacksOfPlanes(students) {
                 if (Object.keys(conversations).includes(student)) {
                     // The student matches with one of the keys
                     const studentConversations = conversations[student];
-                
                     // Create a bubble tag element
                     var bubbleTag = document.createElement('div');
                     bubbleTag.classList.add('bubbleTag');
@@ -360,7 +359,7 @@ var maxHeight = boundingBox.max.y;
 
 // Calculate the center height
 var centerHeight = (minHeight + maxHeight) / 2;
-console.log(boundingBox.setFromObject(scene));
+// console.log(boundingBox.setFromObject(scene));
 
 // Adjust the position of the object to center it vertically
 scene.position.y -= centerHeight + 0.5;
