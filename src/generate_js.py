@@ -8,6 +8,8 @@ import subprocess
 from pdf2image import convert_from_path
 import math
 from PIL import Image
+import string
+import random
 
 # preprocessing functions
 
@@ -31,6 +33,52 @@ def remove_unsupported_file(file_path):
             os.remove(file_path)
             print(f'{file_path} is not supported and is removed, please use one of the supported extensions {supported_extensions}')
 
+
+
+def randomizeFilenames():   
+    for group in sorted(os.listdir("content")):
+        group_path = os.path.join("content", group)
+        if os.path.isdir(group_path):
+            for student in natsorted(os.listdir(group_path)):
+                student_path = os.path.join(group_path, student)
+                if os.path.isdir(student_path):
+                    for week_folder in sorted(os.listdir(student_path)):
+                        week_folder_path = os.path.join(student_path, week_folder)
+                        if os.path.isdir(week_folder_path):
+                            for item in sorted(os.listdir(week_folder_path)):
+                                item_path = os.path.join(week_folder_path, item)
+
+
+                                if os.path.isfile(item_path):
+                                    item.replace(' ','_') #1 replace spaces
+
+                                    base_name, extension = os.path.splitext(item)
+
+                                    random_string = ''.join(random.choices(string.ascii_letters, k=10))
+                                    modified_base_name = base_name[:2] + "_" + random_string #replace everyhtin in basebame except 2 first letter. so it wil still alphabetically
+
+                                    random_name_item = modified_base_name+ extension
+                                    new_item_path = os.path.join(week_folder_path, random_name_item)
+                                    os.rename(item_path, new_item_path)
+                                
+                                if os.path.isdir(item_path) and item != "processed":
+                                    for sub_item in os.listdir(item_path):
+                                        sub_item_path = os.path.join(item_path, sub_item)
+                                        base_name, extension = os.path.splitext(sub_item)
+                                        random_string = ''.join(random.choices(string.ascii_letters, k=10))
+                                        modified_base_name = base_name[:2] + "_" + random_string #replace everyhtin in basebame except 2 first letter. so it wil still alphabetically
+
+                                        random_name_item = modified_base_name+ extension
+                                        new_sub_item_path = os.path.join(item_path, random_name_item)
+                                        os.rename(sub_item_path, new_sub_item_path)
+
+
+ 
+
+
+    
+
+
 def remove_too_big(file_path, maxWidth, maxHeight):
     if os.path.isfile(file_path):
         imageToProcess = Image.open(file_path)
@@ -41,20 +89,24 @@ def remove_too_big(file_path, maxWidth, maxHeight):
             os.remove(file_path)
 
 def preProcessImages(item, week_folder_path, nestedDir=None):
+
     item_path = os.path.join(week_folder_path, item)   
+
+    
     if os.path.isfile(item_path):
         if item_path.lower().endswith((".jpg", ".png", ".jpeg")):
 
+            # randomizeFilenames(file_path)
 
             processed_dir = os.path.join(week_folder_path, "processed")
-            optionalArgs = "-fuzz 10% -transparent white"
+            optionalArgs = "-fuzz 20% -transparent black"
             resizeArg = "-resize 512x512 "
             print(f"processing {item}")    
 
             if nestedDir != None:
                 print("nested directory -images- is activated")
                 processed_dir = os.path.join(nestedDir, "processed")
-                optionalArgs = "-fuzz 20% -transparent white  "  #-negate
+                optionalArgs = "-fuzz 20% -transparent black  "  #-negate
                 
             # if filename contains "long" in filename, set resize to 512x512
             if "long" in os.path.splitext(item)[0]:
@@ -80,6 +132,8 @@ def preProcessText(item, week_folder_path, nestedDir=None):
     item_path = os.path.join(week_folder_path, item)   
     if os.path.isfile(item_path):
         if item_path.lower().endswith((".txt")):
+
+            # randomizeFilenames(file_path)
             processed_dir = os.path.join(week_folder_path, "processed")
 
             textColor = "white"
@@ -132,6 +186,9 @@ def preProcessPdfs(item, week_folder_path, nestedDir=None):
     item_path = os.path.join(week_folder_path, item)   
     if os.path.isfile(item_path):
         if item_path.lower().endswith((".pdf")):
+
+            # randomizeFilenames(file_path)
+
             processed_dir = os.path.join(week_folder_path, "processed")
 
             optionalArgs = '-transparent white'
@@ -170,6 +227,7 @@ def preProcessGifs(item, week_folder_path, nestedDir=None):
     print(item_path)
     if os.path.isfile(item_path):
         if item.lower().endswith((".gif")):
+
             processed_dir = os.path.join(week_folder_path, "processed")
 
             resize_file_if_large(item_path, 1000000) #1mb max, for uploading mainly
@@ -203,7 +261,8 @@ def preProcessGifs(item, week_folder_path, nestedDir=None):
                 if additionalImg !=0:
                     for i in range(0,additionalImg):
                         i = nFrames - i
-                        os.system(f'convert -size 512x512 xc:none -alpha transparent "{os.path.join(gifTempFolder, f"zzz_{i}.png")}"')
+                        # os.system(f'convert -size 512x512 xc:none -alpha transparent "{os.path.join(gifTempFolder, f"zzz_{i}.png")}"')
+                        os.system(f'convert -size 512x512 xc:none  "{os.path.join(gifTempFolder, f"zzz_{i}.png")}"')
                 
                 # rename the files so sorting them wont be an issue
                 for i, img in enumerate(natsorted(os.listdir(gifTempFolder))):
@@ -211,19 +270,22 @@ def preProcessGifs(item, week_folder_path, nestedDir=None):
                     newPath = os.path.join(gifTempFolder, f'{i}_{img}')
                     os.rename(originalPath, newPath)
 
+                # basename = os.path.splitext(item)[0]
                 processed_path = os.path.join(processed_dir, f'{item}_preProcessed_long_.png')
-                os.system(f'convert "{os.path.join(gifTempFolder, "*.png")}" -resize 512x512 -fuzz 10% -transparent black -fuzz 10% -transparent DimGray -append {optionalArgs} "{processed_path}"')
+                # os.system(f'convert "{os.path.join(gifTempFolder, "*.png")}" -resize 512x512 -fuzz 10% -transparent black -fuzz 10% -transparent DimGray -append {optionalArgs} "{processed_path}"')
+                os.system(f'convert "{os.path.join(gifTempFolder, "*.png")}" -resize 512x512  -append {optionalArgs} "{processed_path}"')
 
                 #  make the gif resize and save it
                 processed_path_gif = os.path.join(processed_dir, f'{item}_preProcessed.gif')
                 os.system(f'convert "{item_path}" -coalesce -resize 512x -colors 32 -deconstruct -loop 0  {optionalArgs} "{processed_path_gif}"')
 
 
-                images.append("../" + processed_path_gif) #save normal pdfs so it diplays in info
-                week.append(processed_path) #save alpha pdfs so it diplays in three.js
+                images.append("../" + processed_path_gif)
+                week.append(processed_path)
 
                 # remove tempfolder with content
                 shutil.rmtree(gifTempFolder)
+
 
 
 def generate_html_file(filename, title, groupContent, weeks, content, images, group):
@@ -323,6 +385,8 @@ def check_folder_for_txt_file(folder_path):
     return None
 
 
+randomizeFilenames()
+
 # Loop over every folder in "content"
 for group in sorted(os.listdir("content")):
     group_path = os.path.join("content", group)
@@ -333,6 +397,8 @@ for group in sorted(os.listdir("content")):
         # Loop over every folder inside
         for student in natsorted(os.listdir(group_path)):
             student_path = os.path.join(group_path, student)
+
+            
 
             content = check_folder_for_txt_file(group_path)
             if content:
@@ -366,17 +432,22 @@ for group in sorted(os.listdir("content")):
                             shutil.rmtree(processed_dir)
 
 
-                        for item in sorted(os.listdir(week_folder_path)):  
-                            item_path = os.path.join(week_folder_path, item)  
+                        for item in sorted(os.listdir(week_folder_path)):
+                            item_path = os.path.join(week_folder_path, item)
+
+                            # randomizeFilenames(item_path)
+                            
                             if os.path.isdir(item_path) and item != "processed":
 
                                 os.system(f"""convert -background none -size 256x256 -pointsize 20 -define pango:justify=true  pango:"<span foreground=\\"white\\"> {week_folder}</span> " ./{additional_folder_path}/{week_folder}.png""")
                                 week.append(f'./{additional_folder_path}/{week_folder}.png')
 
-                                
                                 for sub_item in natsorted(os.listdir(item_path)):
                                     sub_item_path = os.path.join(item_path, sub_item)
 
+
+                                    # sub_item = randomizeFilenames(sub_item_path)
+                                    # sub_item_path = os.path.join(item_path, sub_item)
                                     preProcessPdfs(sub_item, item_path, week_folder_path)
                                     preProcessGifs(sub_item, item_path, week_folder_path)
                                     preProcessImages(sub_item, item_path, week_folder_path)
@@ -385,12 +456,15 @@ for group in sorted(os.listdir("content")):
 
 
 
-                        os.system(f"""convert -background none -size 256x256 -pointsize 20 -define pango:justify=true  pango:"<span foreground=\\"white\\">ref: {week_folder}</span> " ./{additional_folder_path}/foo_{week_folder}.png""")
+                        os.system(f"""convert -background none -size 256x256 -pointsize 20 -define pango:justify=true  pango:"<span foreground=\\"white\\">{item}: {week_folder}</span> " ./{additional_folder_path}/foo_{week_folder}.png""")
                         week.append(f'./{additional_folder_path}/foo_{week_folder}.png')
                         
+                        # randomizeFilenames(item_path)
                         
                         for item in natsorted(os.listdir(week_folder_path)):
-    
+                            print(item)
+                            
+                            # randomizeFilenames(week_folder_path)
 
                             preProcessPdfs(item, week_folder_path)
                             preProcessGifs(item, week_folder_path)
