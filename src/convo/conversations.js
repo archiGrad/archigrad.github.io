@@ -65,7 +65,7 @@ const conversations = {
     "jeff": [
         [
             { type: "me", content: "Great idea! AI, memes, holograms, carrier pigeons—our projective archive is gonna be the most extra thing ever! 😂🚀" },
-            { type: "you", content: "Oh, wow, thanks! I'll make sure our holographic memes are spicy enough for the time-travelers. 🔥" },
+            { type: "you", content: "Oh, wow, thanks! I'll make sure our holographic memes are spicy enough for the time travelers. 🔥" },
         ],
     ],
     "tur": [
@@ -76,7 +76,7 @@ const conversations = {
     ],
     "axel": [
         [
-            { type: "lexicon", content: " I can see the headlines now: "AI Curator Roasts Time Travelers' Fashion Choices." 😂" },
+            { type: "lexicon", content: "I can see the headlines now: AI Curator Roasts Time Travelers Fashion Choices. 😂" },
             { type: "lexicon", content: "Hold up, are we building a time capsule for memes? I'm in! 🕰️🎉" },
         ],
     ],
