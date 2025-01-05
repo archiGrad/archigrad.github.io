@@ -1,0 +1,20 @@
+=Microcontrollers and Sensors
+-ESP32
+<programming-interacting-talking to each other and other devices>
+=API-rest-API
+=Archiving
+-git and github
+
+=Mapping Techniques
+-data-driven maps
+-photogrammetry
+-visualizing trajectories
+
+=Houdini Fundamentals
+-real-time 3D heatmaps
+-spatial analysis tools
+-algorithms and data structures
+<interfacing to and with houdini>
+
+<br><br>
+<span>spantags</span>

@@ -1,0 +1,8 @@
+Long Hoon, derived from a Thai term meaning 'invisible, the term 'Long Hoon' characterizes a documentary that unveils the concealed and often disregarded facets of daily life and data in Bangkok, a bustling metropolis that remains active around the clock. This film explores the unnoticed components that are frequently taken for granted, bringing to light the consequences of our actions. The critical analysis takes place in the heart of Bangkok's heavily trafficked area, surrounded by offices. The documentary employs lidar scan systems, sound and thermal analyses, and experiments with the ESP32 device to capture CO data and GPX data, pinpointing hotspots and times of significant traffic congestion. Its objective is to document, contrast, and compare the dynamic and lively city of Bangkok."
+
+
+
+
+
+
+

@@ -1,0 +1,164 @@
+:root { --background-color: #000000; --font-color: rgb(255, 255, 255); --border-color: rgba(111, 111, 111, 0.272); --accent-color1: rgba(100, 100, 100); --accent-color2: rgb(199, 199, 199); --accent-color3: rgba(25, 25, 25);}  
+@font-face {  font-family: 'RobotoSlab';  src: url('./font/RobotoSlab-VariableFont_wght.ttf') format('truetype');  font-weight: 400;}
+html,body {  height: 100%;  margin: 0; background-color: var(--background-color); font-family: 'RobotoSlab'; }
+button{  color: var(--font-color);  background-color: var(--background-color);  border: none;  cursor: pointer;  font-family: 'RobotoSlab';  font-size: 12px;}
+iframe {  top: 0;   left: 0; width: 99.5%;   height: 99.3%;   border: none;  border-left: 1px solid var(--border-color);}
+img{  width: 100px; border: 1px solid rgba(34, 34, 34, 0.319); border-radius: 0px; cursor: pointer;}
+span:not(.bubbleTag):not(.green):not(.blue):not(.red):not(.magenta):not(.custom){pointer-events:stroke; font-size: 30px; background-color: black; /*backdrop-filter: blur(1000px);*/ color: white;  border-radius: 100px; padding: 10px; padding-top: 6px;}
+
+a:visited{color: rgb(255,255,255); }
+
+img .tag{z-index: 10;}
+
+
+
+/* bubbletag */
+.bubbleTag {
+  /* z-index: 99; */
+  /* position: absolute; */
+  /* display: block; */
+  /* color: rgb(255, 255, 255); */
+  width: 150px;
+  /* height: 1px; */
+  /* overflow: hidden; */
+  font-family: Arial, Helvetica, sans-serif;
+  pointer-events: none;
+  /* transition: transform 0.1s ease-in-out; */
+}
+
+
+
+.me {
+  float: right;
+  background-color: rgb(0, 0, 0);
+  color: rgb(255, 255, 255);
+  font-size: 0.5em;
+  border-radius: 5px 5px 5px 5px;
+  margin: 1px;
+  padding: 3px;
+  overflow-wrap: break-word; /* Use overflow-wrap instead of line-break for better compatibility */
+  clear: both;
+  box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+  -webkit-box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+  -moz-box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+}
+
+.you {
+  float: left;
+  background-color: rgb(19, 19, 19);
+  color: rgb(220, 220, 220);
+  font-size: 0.5em;
+  border-radius: 5px 5px 5px 5px;
+  margin: 1px;
+  padding: 3px;
+  overflow-wrap: break-word; /* Use overflow-wrap instead of line-break for better compatibility */
+  clear: both;
+  box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+  -webkit-box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+  -moz-box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+}
+.lexicon {
+  float: left;
+  /* border: 10px solid olive; */
+  background-color: rgb(0, 0, 232);
+  color: rgb(255, 255, 255);
+  font-size: 0.5em;
+  border-radius: 5px 5px 5px 5px;
+  margin: 1px;
+  padding: 3px;
+  overflow-wrap: break-word; /* Use overflow-wrap instead of line-break for better compatibility */
+  clear: both;
+  box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+  -webkit-box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+  -moz-box-shadow: -12px -9px 15px -8px rgba(0,0,0,1);
+}
+
+
+.bubbleTag img{width: 50px; height: 50px; border-radius: 15px; }
+
+table, td, th {
+  border: 1px solid var(--accent-color3);;
+  border-collapse: collapse;
+
+}
+
+sup{font-size: 0.7em;}
+th {
+  width: 25px;
+  height: 26px
+}
+
+table {width: 100%;}
+
+
+a:link, a:visited {
+  color: rgb(128, 128, 128);
+  /* text-decoration: none;  */
+}
+
+
+/* a:active {
+  color: green; /* color when clicked */
+/* } */ */
+
+/* li .green:not(.span) {color:red;} */
+
+ .green{color: rgb(0, 255, 0); font-size: 1em;  backdrop-filter: none ;  border: none;}
+ .blue{color: blue;font-size: 1em;  backdrop-filter: none ;  border: none;}
+ .red{color: red;font-size: 1em;  backdrop-filter: none ;  border: none;}
+ .magenta{color: magenta;font-size: 1em;  backdrop-filter: none ;  border: none;}
+
+  iframe::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: #000000;
+  }
+  
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: #000000 #000000;
+  }
+
+
+  /* Hide scrollbar for Chrome, Safari, and Opera */
+::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+/* Optional: If you want to hide the scrollbar track as well */
+::-webkit-scrollbar-track {
+  display: none;
+}
+
+/* Optional: If you want to hide the scrollbar handle (thumb) */
+::-webkit-scrollbar-thumb {
+  display: none;
+}
+
+
+.textInfo{color: var(--font-color); font-size: 12px; padding: 0px; backdrop-filter: unset;  border: none;}
+.nestedTextInfo{color: var(--accent-color2);}
+
+#groupDescription iframe {     height: 500px;      overflow: hidden;     max-width: 100%; }
+#groupDescription{  color: var(--font-color); margin-right: 30px; margin-left: 30px; font-size: 12px;}
+#content { float: left; width: 70%;  height:100%;  float: left;  overflow: hidden;}
+#header { position: absolute; left: 0; top: 0; width: 10%; margin: 10px;}
+#three {float: left; width: 100%; height: 100%;   z-index: -1;  }
+#info {  width: 30%;  height: 100%;  float: left;  color: var(--font-color);}
+#loading { max-width: 10px; border: none;}
+#screen{ margin-left: -15px; margin-top: 15px; color: rgb(255, 255, 255);  position: absolute; width: 70%;   text-align: right; font-size: 12px; pointer-events: none}
+
+
+
+
+
+@media (max-width: 1000px) { #content{width: 100%;}#info{display: none;}#screen{width: 100%; display: none;}}
+
+
+
+
