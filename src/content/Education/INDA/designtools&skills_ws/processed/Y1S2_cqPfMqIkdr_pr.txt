@@ -1,0 +1,193 @@
+<span class="nestedTextInfo">﻿Y1 DTS2
+	  
+
+	Spring 2025
+	
+
+Digital Making
+An introduction to storytelling through video
+
+
+>>
+	Digital Making Workshop 
+	>>
+	Design Tools and Skills 2
+	>>
+	Semester 2 - January-May 2025
+	>>
+	Instructor:
+Deniz Guvendi
+Joris Putteneers
+	>>
+	Coordinator:
+Tom Jenkins
+	>>
+	Faculty Team:
+Bahnfun (Dream) Chittmittrapap, Deniz Guvendi, Hayden Minick, Hseng Tai Lintner,  Joris Putteneers, Stefan Svedberg, Warisara (Nice) Sudswong.
+	Introduction  
+The Digital Making workshop focuses on the process of translating complex ideas into visually compelling narratives through the creation of a concise 1-minute video project. Over the course of three weeks, students will engage in multimedia storytelling, utilizing tools such as Blender and After Effects.  
+Participants will work through every stage of the production process, including storyboarding, compositional planning, 3D modeling, rendering, and post-production. The curriculum encourages a balance between technical proficiency and creative exploration, guiding students to articulate complex concepts effectively through visual media.
+Ref1_The great endeavor, Liam Young  
+Ref2_None, Ash Thorp
+ Ref3_The Third & The Seventh, Alex Roman
+
+
+Materials Required
+Computer with Blender 4.3, After Effects, Mouse, Earphones
+Learning Objectives
+Students will:
+* Create a 1-minute professional video
+* Master 3D modeling and post-production techniques
+* Develop skills in Blender and After Effects
+Week 1: Conceptualization and Storyboarding
+The first week is about introducing students to the fundamentals, setting the groups, and the theme,build a scene and preparing the template After Effects file. There will be an introduction to Blender tutorial, following a group feedback session.
+Schedule
+* 1-1:30 PM: Lecture
+   * Composition sketches
+   * Foreground, mid, background techniques
+   * Storytelling principles
+   * Resolution and aspect ratio
+* 1:30-3 PM: Tutorials
+   * Installing addons
+   * worldbuilding
+* 3-4:30 PM: Storyboard Group Work
+* 4:30-6 PM: Sequence Assembly
+   * Soundtrack integration
+   * Basic effects
+Key Deliverables
+* 1-minute .mp4 video
+* Submission by Wednesday 11:59 PM
+Key Skills
+* Narrative concept development
+* Compositional sketches
+* Resolution and aspect ratio understanding
+* 5-shot, 1-minute teaser storyboard
+* Soundtrack integration
+Storyboard Structure
+1. Intro Shot: Blend opacity and blur
+2. Close-up Shot 1
+3. Close-up Shot 2
+4. Mid Shot 1
+5. Mid Shot 2
+6. Far Away Shot
+7. Closing Credits
+Rendering Process
+* Import compositional sketches
+* Crop to 1-minute timeline
+* Synchronize with soundtrack
+* Render and upload .mp4
+Week 2: 3D Modeling and Rendering
+The second week is about preparing the scenes for the movies. 3D Modelling in Rhino, Blender, Houdini, scraping/and downloading existing models to prepare the 5 shots in Blender, followed by an introduction to rendering tutorials. The session will end with a group feedback session.
+Schedule
+* 1-3 PM: World Building
+   * World Building (Using existing project or the previous Houdini work is allowed)
+* 3-6 PM: Rendering Tutorials
+   * Blender lighting and animation
+   * Camera techniques
+   * Rendering settings
+Key Deliverables
+* 1-minute .mp4 video
+* Submission by Wednesday 11:59 PM
+Key Skills
+* Blender UI navigation
+* 3D model importing and placement
+* UV unwrapping
+* Camera techniques
+* Lighting and atmospheric effects
+Shot Composition
+1. Close-up Shot
+   * Human-held camera
+   * Depth of field
+2. Mid Shot
+   * Drone or handheld camera
+3. Far Away Shot
+Rendering Considerations
+* Pre-render in OpenGL
+* Check timing and animation
+* Render in Cycles
+* Integrate with After Effects
+Week 3: Compositing and Post-Production
+The third week is about wrapping up the 1-minute videos. Post-processing tutorials will follow group-by-group feedback sessions. 
+Schedule
+* 1-3 PM: Group Tutorials
+   * Story feedback
+* 3-6 PM: Group Execution
+   * Post-processing
+   * Sharpening
+   * Frame interpolation
+Key Deliverables
+* 1-minute .mp4 video
+* Submission by Wednesday 11:59 PM
+Key Skills
+* Multi-layer compositing
+* Sound design
+* Particle effect integration
+* Color grading
+* Frame interpolation
+Shot Composition Revisions
+1. Intro Shot: Blend opacity and blur
+2. Close-up Shot 1
+3. Close-up Shot 2
+4. Mid Shot 1
+5. Mid Shot 2
+6. Far Away Shot
+Post-Production Techniques
+* Atmospheric layer addition
+* Sound layering (wind, footsteps, drone)
+* Color grading
+* Vignetting
+* Grain application
+Rendering Time Calculation
+* 1 frame = 5 minutes rendering
+* 1-minute video (30 fps) = 1800 frames
+* Total potential rendering time: 6.25 days
+Grading Criteria
+Completion: 40%
+* Timely submission
+* Adherence to brief instructions
+* Deliverables in good condition
+Evaluation Metrics: 60%
+* Storyline maturity
+* Compositional quality
+* Technical execution
+* Overall visual experience
+Emphasis
+The course prioritizes personal artistic expression and creative interpretation. Technical skills are important, but the focus is on innovative storytelling and visual communication.
+Pro Tips
+* Pre-render animations in OpenGL
+* Calculate render times meticulously
+* Don't underestimate post-processing complexity
+* Focus on slow, deliberate camera movements
+Keywords: #procedural #node #attribute #data-driven #rendering #compositing #storytelling #narrative #storyboarding #cinematography #visual-composition #blender #houdini #after-effects #depth of field #aspect-ratio #fps (frame per second) #ambient occlusion #opengl #uv-mapping #camera-animation #motion-design #sound-integration #color-grading #frame-interpolation #visual-effects #temporal-dynamics #spatial-composition #experimental-visualization #multimedia-storytelling #creative-interpretation 
+
+
+
+
+
+
+
+
+
+
+TEXT EDITOR- Delete Textures in Blender 
+Run the script:
+import bpy
+for material in bpy.data.materials:
+    material.user_clear()
+    bpy.data.materials.remove(material)
+
+
+INFO: ShortCuts Blender
+ADD-ONS: https://extensions.blender.org/add-ons/drag-and-drop-support/
+ADD_ON: https://github.com/EatTheFuture/camera_shakify/
+Preferences—> Add-on —-> Node Wrangler (activate)
+
+
+
+
+
+
+	 of 
+	  
+
+	 |International Program in Design + Architecture | Room 409, Architecture Building. Faculty of Architecture, Chulalongkorn University. Phayathai Road, Bangkok 10330 Thailand |</span>

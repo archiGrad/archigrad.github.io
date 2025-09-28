@@ -1,0 +1,3 @@
+<span class="nestedTextInfo">siam sq. soi 7    13.744194 100.5352198
+centralworld      13.746534  100.539220
+faculty of architecture  13.7395903  100.5308009</span>

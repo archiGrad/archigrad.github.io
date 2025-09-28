@@ -1,7 +1,18 @@
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.121.1/build/three.module.js'
 import {    OrbitControls} from 'https://cdn.jsdelivr.net/npm/three@0.121.1/examples/jsm/controls/OrbitControls.js'
 
+// ADD THIS CHECK HERE - before any other code runs:
+if (typeof groups === 'undefined') {
+    console.error('Error: groups variable not defined. Make sure data.js is loaded first.');
+    // Provide fallback or stop execution
+}
 
+if (typeof conversations === 'undefined') {
+    console.warn('Warning: conversations variable not defined. Some features may not work.');
+    console.log('Groups loaded:', typeof groups, groups);
+    console.log('Conversations loaded:', typeof conversations, conversations);
+    var conversations = {}; // Provide empty fallback
+}
 
 var scene = new THREE.Scene();
 
@@ -45,7 +56,7 @@ var threeDiv = document.getElementById('three');
 var screenDiv = document.getElementById('screen');
 
 var headerDiv = document.getElementById("header");
-
+var textureLoader = new THREE.TextureLoader();
 // Create an orthographic camera with adjusted frustum size
 // const zoomFactor = 60; // Adjust this value to control the zoom level
 const aspectRatio = threeDiv.offsetWidth / threeDiv.offsetHeight;
@@ -101,7 +112,12 @@ function createStacksOfPlanes(students) {
             let screenDivContent = '.'
             const allImageUrls = Math.floor(imageUrls.length)
             const rootAllImageUrls = Math.ceil(Math.sqrt(allImageUrls)+1)
-
+    function createStacksOfPlanes(students) {
+        // Add this check at the start:
+        if (!students || typeof students !== 'object') {
+            console.error('Students data is undefined or invalid:', students);
+            return;
+        }
             for (const url of imageUrls) {
                 loader.load(url, (texture) => {
                     loadedTextures.push(texture);
@@ -117,9 +133,11 @@ function createStacksOfPlanes(students) {
 
                     if (loadedCount === allImageUrls) {
                         resolve(loadedTextures);
-                    }   
+                    } 
+                      
                 });
             }
+        }
         });
     }
 
@@ -192,16 +210,17 @@ function createStacksOfPlanes(students) {
     
                         var frameDuration = 200; // speed
                         var currentFrame = 0;
-                        var frameTimer = setInterval(function() {
-                            currentFrame = (currentFrame + 1) % totalFrames;
-                            texture.offset.y = 1 - (currentFrame / totalFrames);
-                        }, frameDuration);
+                        function animateGifFrame() {
+                        currentFrame = (currentFrame + 1) % totalFrames;
+                        texture.offset.y = 1 - (currentFrame / totalFrames);
+                        }
+                        var frameTimer = setInterval(animateGifFrame, frameDuration);
                     });
             } else {
                 // Load normal image
                 texture = textureLoader.load(content[j]);
             }
-
+                      
             texture.minFilter = THREE.NearestFilter;
             texture.magFilter = THREE.NearestFilter;
 
@@ -633,17 +652,23 @@ function onWindowResize() {
     }
 
 }
+console.log('projectName:', projectName);
+console.log('Available groups:', Object.keys(groups));
 
+var randomGroup = groups[projectName] || groups["About"] || {};
+console.log('randomGroup:', randomGroup);
 
-var randomGroup = groups[projectName]
-createStacksOfPlanes(randomGroup);
+if (Object.keys(randomGroup).length === 0) {
+    console.error('No data found for project:', projectName);
+} else {
+    createStacksOfPlanes(randomGroup);
+}
 
-/// Calculate the maximum and minimum heights so that the mopdel is always centered on the screen
+// Calculate the maximum and minimum heights so that the model is always centered on the screen
 var boundingBox = new THREE.Box3();
 boundingBox.setFromObject(scene);
 var minHeight = boundingBox.min.y;
 var maxHeight = boundingBox.max.y;
-
 
 // Calculate the center height
 var centerHeight = (minHeight + maxHeight) / 2;

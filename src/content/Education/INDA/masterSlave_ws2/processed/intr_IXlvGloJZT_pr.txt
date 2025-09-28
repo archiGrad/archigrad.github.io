@@ -1,0 +1,5 @@
+<span class="textInfo">Meet A!Ai, the urban explorer fashioned from Bangkok's favorite material: blue PVC pipes. Inspired by a forgotten alley between shopping malls, A!Ai became such a sensation that even the security demanded its papers. So, we did what any proud parent would do – registered it and got it a birth certificate. Now, A!Ai flaunts two ESP32 modules, flashing its location, date, and time on one screen and pixelated 3D scans of urban artifacts on the other. Born out of a 10-day workshop, A!Ai is a swift dive into tech and art, responding to its urban surroundings with a unique blend of creativity and innovation.
+
+<br><br>
+<span>spantags</span>
+</span>

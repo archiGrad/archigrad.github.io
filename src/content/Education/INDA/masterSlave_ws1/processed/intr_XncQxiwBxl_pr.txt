@@ -1,0 +1,4 @@
+<span class="textInfo">This project reimagines multi-studio spaces through data-informed design strategies. By analyzing acoustic patterns and spatial dynamics, proposing a refined layout to foster optimal soundscapes. The design prioritizes functionality and aesthetics, creating a harmonious environment that elevates the creative experience within each studio.
+<br><br>
+<span>spantags</span>
+</span>
