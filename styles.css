@@ -1,4 +1,12 @@
+@font-face {
+    font-family: 'PixelifySans';
+    src: url('fonts_website/UbuntuMono-Regular.ttf') format('truetype');
+    font-display: swap;
+}
+
+
 :root {
+    --font-family-main: 'PixelifySans', monospace;
     --font-ui: 12px;
     --font-dots-sm: 14px;
     --font-dots-md: 14px;
@@ -10,7 +18,7 @@
 body { 
     background: black; 
     color: white; 
-    font-family: monospace; 
+    font-family: var(--font-family-main);
     font-size: var(--font-ui, 11px);
     display: flex;
     height: 100vh;
@@ -41,7 +49,7 @@ body {
 #nav-back, #nav-fwd, #tree-expand-all {
     cursor: pointer;
     color: #555;
-    font-family: monospace;
+    font-family: var(--font-family-main);
     font-weight: 900;
     font-size: calc(var(--font-ui) + 2px);
     user-select: none;
@@ -52,7 +60,7 @@ body {
 #tree-legend {
     padding-top: 10px;
     padding-bottom: 4px;
-    font-family: monospace;
+    font-family: var(--font-family-main);
     font-size: 11px;
     color: #444;
     display: flex;
@@ -66,7 +74,7 @@ body {
     background: rgba(0,0,0,0);
     color: white;
     border: none;
-    font-family: monospace;
+    font-family: var(--font-family-main);
     font-size: var(--font-ui, 11px);
     outline: none;
 }
@@ -173,7 +181,7 @@ body {
     pointer-events: none;
     cursor: pointer;
     color: white;
-    font-family: monospace;
+    font-family: var(--font-family-main);
     font-size: var(--font-ui, 11px);
     user-select: none;
     background: black;
@@ -223,7 +231,7 @@ canvas { display: block; width: 100%; height: 100%; }
     margin-top: 8px;
     padding-top: 8px;
     border-top: 1px solid #333;
-    font-family: monospace;
+    font-family: var(--font-family-main);
     font-size: var(--font-ui, 11px);
     color: #ccc;
 }
@@ -292,7 +300,7 @@ canvas { display: block; width: 100%; height: 100%; }
     display: none;
     pointer-events: none;
     z-index: 2;
-    font-family: monospace;
+    font-family: var(--font-family-main);
     font-size: 11px;
     color: #888;
     white-space: nowrap;
@@ -333,7 +341,7 @@ canvas { display: block; width: 100%; height: 100%; }
     position: absolute;
     bottom: 10px;
     left: 5px;
-    font-family: monospace;
+    font-family: var(--font-family-main);
     font-size: var(--font-page-index, 10px);
     color: #666;
 }
