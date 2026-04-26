@@ -174,7 +174,7 @@ THREE.ColorManagement.enabled = false;
 (() => {
     const section = document.getElementById('debug-section');
     const statsCheckbox = document.getElementById('debug-stats');
-    statsCheckbox.checked = localStorage.getItem('debug_show_stats') !== '0';
+    statsCheckbox.checked = localStorage.getItem('debug_show_stats') === '1';
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'd') return;
         const t = e.target;
@@ -1898,7 +1898,7 @@ const updateCount = () => {
     stats.dom.style.position = 'absolute';
     stats.dom.style.top = '30px';
     stats.dom.style.left = '5px';
-    if (localStorage.getItem('debug_show_stats') === '0') stats.dom.style.display = 'none';
+    if (localStorage.getItem('debug_show_stats') !== '1') stats.dom.style.display = 'none';
     window._statsInstances = window._statsInstances || [];
     window._statsInstances.push(stats.dom);
 
