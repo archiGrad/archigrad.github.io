@@ -1,0 +1,16 @@
+# .custom_processing - exported from batch runner
+PIPELINE_ORDER = [{"step":"colorize","enabled":false,"params":{"COLORIZE_COLOR":[0,255,30],"COLORIZE_THRESHOLD":250}},{"step":"color_to_transparent","enabled":false,"params":{"COLOR_TO_TRANSPARENT_COLOR":[177,78,78],"COLOR_TO_TRANSPARENT_THRESHOLD":null}},{"step":"fill","enabled":false,"params":{"FILL_COLOR":[0,255,64],"FILL_THRESHOLD":1}},{"step":"blur","enabled":false,"params":{"GAUSSIAN_BLUR_RADIUS":3}},{"step":"dither","enabled":true,"params":{"DITHER_MODE":"color_reduce","DITHER_METHOD":"floyd_steinberg","DITHER_COLORS":64,"CUSTOM_PALETTE":[]}}]
+SPRITE_SIZE = 128
+RESIZE_METHOD = "LANCZOS"
+PROCESSING_SCOPE = "stack"
+MAX_GIF_FRAMES = 30
+GIF_SPEED = 0.8
+IMAGE_SETTINGS_LABELS = true
+IMAGE_SETTINGS_COLOR = [255,255,255]
+IMAGE_SETTINGS_FONTSIZE = 4
+IMAGE_SETTINGS_CUSTOMTEXT = "jos"
+IMAGE_SETTINGS_MODE = "custom_text"
+LABEL_SPRITE_SIZE = 512
+SQUARE_IMAGES = true
+TRANSPARENCY_THRESHOLD = 0.001
+STACK_SPACING = 0.045

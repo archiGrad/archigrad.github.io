@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+venv/
+node_modules/
+.DS_Store
+archiGrad.io/ORIGINAL/
+archiGrad.io/workfolder/
