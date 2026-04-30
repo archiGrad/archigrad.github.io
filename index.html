@@ -1582,16 +1582,27 @@ const updateCount = () => {
                 relPath = folderName;
             }
             const groupKey = relPath.split('/').filter(p => p)[0] || folderName.split('/').pop();
+            let lblX = xPos, lblZ = zPos;
+            const lblGroupKey = folderToGroup[folderName];
+            if (lblGroupKey) {
+                const lblGt = groupTransforms[lblGroupKey];
+                if (lblGt && lblGt.mat) {
+                    const _lv = new THREE.Vector3(xPos, 0, zPos).applyMatrix4(lblGt.mat);
+                    lblX = _lv.x; lblZ = _lv.z;
+                }
+            }
             if (!groupLabelData[groupKey]) {
-                groupLabelData[groupKey] = { maxY: topY, xPos, zPos, folders: [], scenePath };
+                groupLabelData[groupKey] = { maxY: topY, xPos: lblX, zPos: lblZ, folders: [], scenePath };
             }
             if (topY > groupLabelData[groupKey].maxY) {
                 groupLabelData[groupKey].maxY = topY;
-                groupLabelData[groupKey].xPos = xPos;
-                groupLabelData[groupKey].zPos = zPos;
+                groupLabelData[groupKey].xPos = lblX;
+                groupLabelData[groupKey].zPos = lblZ;
             }
-            groupLabelData[groupKey].folders.push({ folderName, relPath, imageCount: stackImages.length, xPos, zPos, topY });
+            groupLabelData[groupKey].folders.push({ folderName, relPath, imageCount: stackImages.length, xPos: lblX, zPos: lblZ, topY });
         }
+            
+
 
         for (const [bKey, bucket] of Object.entries(animBuckets)) {
             const count = bucket.instances.length;
