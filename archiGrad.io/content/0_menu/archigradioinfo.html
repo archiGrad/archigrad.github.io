@@ -1,0 +1,62 @@
+<div class="text_center_fullscreen">
+  <div class="home_inner">
+    <br><div style="font-size:1.5em;">archigrad.io</div>
+<br>Is making [<span class="sw" data-pool="0">architecture</span>] and [<span class="sw" data-pool="0">architecture</span>].
+    <br>welcome to our [<span class="sw" data-pool="1">directory</span>].
+    <br>working [<span class="sw" data-pool="2">worldwide</span>].
+    <br><br>
+    <a href="https://archigrad.io/?path=archiGrad.io%2Fcontent%2Fwork%2Feducation">education</a> 
+    <a href="https://archigrad.io/?path=archiGrad.io%2Fcontent%2Fwork%2FProjects">projects</a> 
+    <a href="https://archigrad.io/?path=archiGrad.io%2Fcontent%2Fwork%2Fresearch">research</a> 
+    <a href="https://archigrad.io/?path=archiGrad.io%2Finfo%2Fcontact">contact</a> 
+  </div>
+</div>
+<script>
+  (() => {
+    const pools = [
+      ['architecture','ecology','robotics','computation','design','software','hardware','fabrication'],
+      ['directory','folder','archive','filesystem','progress','structure','website','narrrative','projects','projection'],
+      ['worldwide','locally','in turkey','in belgium','on earth','in the cloud','on the edge','in the future','in the present','hardly']
+    ];
+    function makeWeighted(pool, country) {
+      if (!country) return pool;
+      const c = 'in ' + country.toLowerCase();
+      const base = pool.map(w => w.toLowerCase()).includes(c) ? pool : [...pool, c];
+      const match = base.find(w => w.toLowerCase() === c);
+      return [...base, match, match, match];
+    }
+    function startSwap(span, pool) {
+      let current = span.textContent;
+      function swap() {
+        const filtered = pool.filter(w => w !== current);
+        current = filtered[Math.floor(Math.random() * filtered.length)];
+        span.textContent = current;
+        setTimeout(swap, 10 + Math.random() * 990);
+      }
+      setTimeout(swap, 10 + Math.random() * 990);
+    }
+    function init(country) {
+      document.querySelectorAll('.sw').forEach(span => {
+        const i = parseInt(span.dataset.pool);
+        const pool = i === 2 ? makeWeighted(pools[i], country) : pools[i];
+        startSwap(span, pool);
+      });
+    }
+    const cached = sessionStorage.getItem('country');
+    if (cached !== null) {
+      init(cached === '' ? null : cached);
+    } else {
+      fetch('https://ipapi.co/json/')
+        .then(r => r.json())
+        .then(d => {
+          const c = d.country_name || '';
+          sessionStorage.setItem('country', c);
+          init(c || null);
+        })
+        .catch(() => {
+          sessionStorage.setItem('country', '');
+          init(null);
+        });
+    }
+  })();
+</script>

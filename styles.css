@@ -152,7 +152,7 @@ body {
 .text-page-inner .columns_2_right_wide > *,
 .text-page-inner .config-columns > * {
     min-width: 0;
-    overflow-x: auto;
+    /* overflow-x: auto; */
 }
 
 .text-page-inner:has(> .text_center_fullscreen) {
