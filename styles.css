@@ -362,7 +362,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 
 .text_center_fullscreen {
-    font-size: var(--text-content-fontsize, 5px);
+    /* font-size: var(--text-content-fontsize, 5px); */
     display: flex;
     justify-content: center;
     width: 100%;
@@ -575,8 +575,29 @@ a {
 }
 
 @media (max-width: 768px) {
+
+
+
+
+
+   /* this removes the pres centering from desktop, so its cleaner on mobile    */
+
+.text-page {
+    display: block;
+}
+.text-page-inner {
+    width: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+
+
+
+
+
     :root {
-        --font-ui: 11px;
+        --font-ui: 0.7em;
     }
     body {
         flex-direction: column;
@@ -658,9 +679,9 @@ a {
     .page-separator {
         border-top: 1px solid #111;
     }
-    .text_center_fullscreen {
+    /* .text_center_fullscreen {
         font-size: 14px;
-    }
+    } */
 }
 
 

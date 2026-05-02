@@ -2373,7 +2373,9 @@ async function renderContent(node, page) {
             childWidth = mvs ? '100%' : `calc(${100/cols}% - 2px)`;
         }
         div.style.width = childWidth;
-        div.style.height = mvs ? 'calc(50% - 2px)' : (count <= 2 ? '100%' : `calc(${100/Math.ceil(count/cols)}% - 2px)`); 
+
+            div.style.height = mvs ? (t.length === 2 ? 'calc(50% - 2px)' : (child.at.length ? 'calc(30% - 2px)' : 'calc(70% - 2px)')) : (count <= 2 ? '100%' : `calc(${100/Math.ceil(count/cols)}% - 2px)`);
+            
         const label = document.createElement('div');
         label.className = 'div-label';
         label.innerHTML = breadcrumbHtml(child.path, currentNode.path);
