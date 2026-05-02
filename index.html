@@ -23,10 +23,17 @@
         <span><span style="color:#f44;">●</span> text_hard_stop</span>
         <span><span style="color:#fff;">●</span> text page</span>
     </div>
-    <div id="debug-section" style="display:none;">
+   <div id="debug-section" style="display:none;">
         <div id="debug-section-title">debug (d)</div>
         <label class="debug-row">
             <input type="checkbox" id="debug-stats"> stats
+        </label>
+        <label class="debug-row">
+            <input type="checkbox" id="debug-persp"> perspective cam
+        </label>
+        <label class="debug-row" id="debug-fov-row" style="display:none;">
+            fov <input type="range" id="debug-fov" min="10" max="170" step="1" value="50" style="width:100px;">
+            <span id="debug-fov-val">50</span>
         </label>
     </div>
 </div>
@@ -174,7 +181,17 @@ THREE.ColorManagement.enabled = false;
 (() => {
     const section = document.getElementById('debug-section');
     const statsCheckbox = document.getElementById('debug-stats');
+    const perspCheckbox = document.getElementById('debug-persp');
+    const fovRow = document.getElementById('debug-fov-row');
+    const fovSlider = document.getElementById('debug-fov');
+    const fovVal = document.getElementById('debug-fov-val');
+
     statsCheckbox.checked = localStorage.getItem('debug_show_stats') === '1';
+    perspCheckbox.checked = localStorage.getItem('debug_persp') === '1';
+    fovSlider.value = localStorage.getItem('debug_fov') || '50';
+    fovVal.textContent = fovSlider.value;
+    fovRow.style.display = perspCheckbox.checked ? 'flex' : 'none';
+
     document.addEventListener('keydown', (e) => {
         if (e.key !== 'd') return;
         const t = e.target;
@@ -186,7 +203,20 @@ THREE.ColorManagement.enabled = false;
         localStorage.setItem('debug_show_stats', show ? '1' : '0');
         (window._statsInstances || []).forEach(dom => { dom.style.display = show ? '' : 'none'; });
     });
+    perspCheckbox.addEventListener('change', () => {
+        const on = perspCheckbox.checked;
+        localStorage.setItem('debug_persp', on ? '1' : '0');
+        fovRow.style.display = on ? 'flex' : 'none';
+        (window._cameraSwitchers || []).forEach(fn => fn(on, parseFloat(fovSlider.value)));
+    });
+    fovSlider.addEventListener('input', () => {
+        fovVal.textContent = fovSlider.value;
+        localStorage.setItem('debug_fov', fovSlider.value);
+        (window._cameraFovSetters || []).forEach(fn => fn(parseFloat(fovSlider.value)));
+    });
 })();
+window._cameraSwitchers = window._cameraSwitchers || [];
+window._cameraFovSetters = window._cameraFovSetters || [];
 
 const loader = document.createElement('div');
 loader.id = 'loader';
@@ -1309,7 +1339,7 @@ async function createThreeScene(container, images, node, highlightPath) {
     const frustumSize = fitFrustumSize * randomZoom;
 
     // --- 4. Create Camera ---
-    const camera = new THREE.OrthographicCamera(
+    const orthoCam = new THREE.OrthographicCamera(
         frustumSize * aspectRatio / -2,
         frustumSize * aspectRatio / 2,
         frustumSize / 2,
@@ -1317,14 +1347,22 @@ async function createThreeScene(container, images, node, highlightPath) {
         0.1,
         1000
     );
+    const perspCam = new THREE.PerspectiveCamera(
+        parseFloat(localStorage.getItem('debug_fov') || '50'),
+        aspectRatio,
+        0.1,
+        1000
+    );
+    let camera = localStorage.getItem('debug_persp') === '1' ? perspCam : orthoCam;
     
     const renderer = new THREE.WebGLRenderer({ 
-        alpha: true, 
-        antialias: true,
+        alpha: false, 
+        antialias: false,
         powerPreference: 'high-performance'
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    //renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setPixelRatio(1);
     renderer.setClearColor(0x000000);
     initKTX2(renderer);
 
@@ -1336,7 +1374,7 @@ async function createThreeScene(container, images, node, highlightPath) {
     const ssBg = needsSsBg ? createSpritesheetBg(container, images, SPRITESHEET_SIZE, scene, renderer, spriteBgEnabled ? spriteBgOpacity : 0, { enabled: spriteBgCrop, opacity: spriteBgCropOpacity }) : null;
 
     container.appendChild(renderer.domElement);
-    const controls = new OrbitControls(camera, renderer.domElement);
+    let controls = new OrbitControls(camera, renderer.domElement);
     controls.enablePan = true;
     controls.zoomSpeed = 3.0;
 
@@ -1912,18 +1950,48 @@ const updateCount = () => {
     if (localStorage.getItem('debug_show_stats') !== '1') stats.dom.style.display = 'none';
     window._statsInstances = window._statsInstances || [];
     window._statsInstances.push(stats.dom);
+            
 
-    const resizeHandler = () => {
+
+    const infoDiv = document.createElement('div');
+    infoDiv.style.cssText = 'position:absolute;top:80px;left:5px;font-family:monospace;font-size:11px;color:#888;background:rgba(0,0,0,0.5);padding:3px 5px;pointer-events:none;';
+    if (localStorage.getItem('debug_show_stats') !== '1') infoDiv.style.display = 'none';
+    container.appendChild(infoDiv);
+    window._statsInstances.push(infoDiv);
+
+const resizeHandler = () => {
         const newAspect = container.clientWidth / container.clientHeight;
-        camera.left = frustumSize * newAspect / -2;
-        camera.right = frustumSize * newAspect / 2;
-        camera.updateProjectionMatrix();
+        orthoCam.left = frustumSize * newAspect / -2;
+        orthoCam.right = frustumSize * newAspect / 2;
+        orthoCam.updateProjectionMatrix();
+        perspCam.aspect = newAspect;
+        perspCam.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
     };
 
     new ResizeObserver(() => resizeHandler()).observe(container);
-            
 
+    window._cameraSwitchers.push((toPersp, fov) => {
+        const next = toPersp ? perspCam : orthoCam;
+        if (next === camera) return;
+        next.position.copy(camera.position);
+        next.quaternion.copy(camera.quaternion);
+        if (toPersp) { next.fov = fov; }
+        next.updateProjectionMatrix();
+        const target = controls.target.clone();
+        controls.dispose();
+        camera = next;
+        controls = new OrbitControls(camera, renderer.domElement);
+        controls.enablePan = true;
+        controls.zoomSpeed = 3.0;
+        controls.target.copy(target);
+        sceneData.camera = camera;
+        sceneData.controls = controls;
+    });
+    window._cameraFovSetters.push((fov) => {
+        perspCam.fov = fov;
+        perspCam.updateProjectionMatrix();
+    });
 
     const sceneData = { scene, renderer, camera, controls, animationId: null, resizeHandler, labelContainer, countDiv, stackGroups, ssBg };
 
@@ -1963,8 +2031,10 @@ const updateCount = () => {
             }
         }
 
-        if (frameCount % 15 === 0) {
-            const viewHeight = (camera.top - camera.bottom) / camera.zoom;
+        if (frameCount % 50 === 0) {
+
+            const viewHeight = camera.isOrthographicCamera ? (camera.top - camera.bottom) / camera.zoom : 2 * Math.tan(camera.fov * Math.PI / 360) * camera.position.distanceTo(controls.target);
+
             const targetLod = viewHeight < spriteConfig.lod_viewheight_thresholds[0] ? 0 : viewHeight < spriteConfig.lod_viewheight_thresholds[1] ? 1 : 2;
             for (const mat of sceneMaterials) {
                 if (!mat._ssArray) continue;
@@ -2235,10 +2305,15 @@ const updateCount = () => {
             }
         }
 
-        if (ssBg) ssBg.update(camera, now);
-
+        if (ssBg) ssBg.update(camera, now);            
         frameCount++;
         renderer.render(scene, camera);
+            
+        if (infoDiv.style.display !== 'none') {
+            const r = renderer.info.render, m = renderer.info.memory;
+            infoDiv.textContent = `tris: ${r.triangles} | pts: ${r.points} | lines: ${r.lines} | calls: ${r.calls} | geo: ${m.geometries} | tex: ${m.textures} | progs: ${renderer.info.programs.length}`;
+        }
+
         stats.end();
     }
     animate();
