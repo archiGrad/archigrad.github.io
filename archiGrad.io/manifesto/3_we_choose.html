@@ -1,0 +1,90 @@
+<div class="text_center_fullscreen">
+  <div class="home_inner">
+    <br>
+    <div style="font-size:1.5em;">We choose,</div><br><br>
+    <span class="sw" data-a="pixels" data-b="points" data-sep="&gt;" data-min="5" data-max="30" data-color="white"></span>,<br>
+    <span class="sw" data-a="gradients" data-b="grids" data-sep="&gt;" data-min="2" data-max="10" data-color="white"></span>,<br>
+    <span class="sw" data-a="contours" data-b="terrains" data-sep="&gt;" data-min="1" data-max="5" data-color="white"></span>,<br>
+    <span class="sw" data-a="PLAY" data-b="WORK" data-sep="&gt;" data-min="1" data-max="10" data-color="white"></span>,<br>
+    <span class="sw" data-a="SLAP" data-b="SLOP" data-sep="&gt;" data-min="2" data-max="5" data-color="white"></span>,<br>
+    <span class="sw" data-a="scraping" data-b="scrolling" data-sep="&gt;" data-min="2" data-max="10" data-color="white"></span>,<br>
+    <span class="sw" data-a="synthetic" data-b="artificial" data-sep="&gt;" data-min="1" data-max="2" data-color="white"></span>,<br>
+    <span class="sw" data-a="authentic submissions" data-b="corpo competitions" data-sep="&gt;" data-min="10" data-max="14" data-color="white"></span>,<br>
+    <span class="sw" data-a="agency" data-b="agents" data-sep="&gt;" data-min="6" data-max="8" data-color="white"></span>,<br>
+    <span class="sw" data-a="performance" data-b="performative" data-sep="?" data-min="2" data-max="10" data-color="white"></span>,<br>
+    <span class="sw" data-a="RGBA" data-b="CMYK" data-sep="&gt;" data-min="1" data-max="5" data-color="white"></span>,<br>
+    <span class="sw" data-a="arithmetic" data-b="algorithmic" data-sep="&gt;" data-min="2" data-max="5" data-color="white"></span>,<br>
+    <span class="sw" data-a="tangible artifact" data-b="residual reference" data-sep="&gt;" data-min="1" data-max="5" data-color="white"></span><br><br>
+
+    <span class="sw" data-a="making" data-b="thinking" data-sep="=" data-min="3" data-max="6" data-color="red"></span>,<br>
+    but most importantly,<br>
+    <a href="https://en.wikipedia.org/wiki/Hans_Hollein">Alles ist Architektur</a>, <br>
+    <a href="https://en.wikipedia.org/wiki/P_versus_NP_problem">P ≠ NP.</a><br>
+    <br>
+    &gt;<br><br>
+    crafted with love,<br>
+    yours truly,<br>
+    <a href="https://archigrad.io">archiGrad.io</a>
+    &lt;
+
+
+    <div style="text-align:center;">
+      <br>
+      |<br>|<br>V
+      <br><br><br>        
+    </div>
+
+    
+  </div>
+</div>
+
+<script>
+  (() => {
+    const pools = {
+      ops: ['=', '-', '+'],
+      grads: ['ascend and descend', 'valleys and peaks', 'mountains and creeks', 'locals and globals']
+    };
+    function rand(min, max) { return min + Math.random() * (max - min); }
+    function startPoolSwap(span) {
+      const pool = pools[span.dataset.pool];
+      let current = pool[Math.floor(Math.random() * pool.length)];
+      span.textContent = current;
+      function swap() {
+        const filtered = pool.filter(w => w !== current);
+        current = filtered[Math.floor(Math.random() * filtered.length)];
+        span.textContent = current;
+        setTimeout(swap, rand(0.05, 3) * 1000);
+      }
+      setTimeout(swap, rand(0.05, 3) * 1000);
+    }
+    function startPairSwap(span) {
+      const a = span.dataset.a, b = span.dataset.b, sep = span.dataset.sep;
+      const min = parseFloat(span.dataset.min), max = parseFloat(span.dataset.max);
+      const lo = 1, hi = 30, stepMs = 40;
+      let count = Math.floor(rand(lo, hi));
+      let target = Math.floor(rand(lo, hi));
+      function render() { span.textContent = `${a} ${sep.repeat(count)} ${b}`; }
+      render();
+      function step() {
+        if (count === target) {
+          setTimeout(() => { target = Math.floor(rand(lo, hi)); step(); }, rand(min, max) * 1000);
+          return;
+        }
+        count += count < target ? 1 : -1;
+        render();
+        setTimeout(step, stepMs);
+      }
+      setTimeout(step, stepMs);
+    }
+    document.querySelectorAll('.sw').forEach(span => {
+      if (span.dataset.pool) {
+        if (!pools[span.dataset.pool]) return;
+        if (span.dataset.color) span.style.color = span.dataset.color;
+        startPoolSwap(span);
+      } else if (span.dataset.a) {
+        if (span.dataset.color) span.style.color = span.dataset.color;
+        startPairSwap(span);
+      }
+    });
+  })();
+</script>

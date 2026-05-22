@@ -1,0 +1,70 @@
+<div class="text_center_fullscreen">
+  <div class="home_inner">
+  <br>
+
+  <div style="font-size:1.5em;">example</div><br><br>
+
+<p>For the sake of a fair comparison, I assume that both the 3D model and texture are properly optimized: a 4MB .glb model with 3 materials, and a 2MB 8K .ktx2 texture.</p>
+
+<br><br>
+
+<div style="display:inline-block;text-align:left;white-space:pre;font-family:monospace;">
+                             | .glb                      | .ktx2
+─────────────────────────────┼───────────────────────────┼──────────────────────────
+on-disk MB per project       | 4 MB                      | 60 KB <span style="color:red;">(1)</span>
+VRAM per project             | ~20-25 MB <span style="color:red;">(2)</span>             | ~2.5 MB <span style="color:red;">(3)</span>
+CPU RAM per project          | ~20-25 MB (retained)      | ~0 MB (released)
+draw calls per stack         | 3                         | 1 + 1 per anim bucket
+shader compiles per project  | 1 per material            | 0 (shared, one compile total)
+CPU decode per project       | yes (draco + image)       | no (BC7 passes through) <span style="color:red;">(5)</span>
+scaling                      | O(N) linear               | O(N / 34) amortized <span style="color:red;">(4)</span>
+</div>
+
+<br><br>
+
+<p><span style="color:red;">(1)</span> An 8192 × 8192 atlas divided into 256 × 256 slices yields 1,024 slots.<br>
+At roughly 30 slices per project, that is about 34 projects per atlas.<br>
+2 MB on disk / 34 projects ≈ 60 KB per project.</p>
+
+<br><br>
+
+<p><span style="color:red;">(2)</span> Assume a 4 MB .glb consists of 3 MB <a href="https://github.com/google/draco">Draco</a>-compressed geometry plus a 1 MB embedded 1024 × 1024 PNG texture.<br>
+On CPU decode:<br>
+&nbsp;&nbsp;geometry buffers ≈ 15-20 MB (Draco compression ratio ~5-7×)<br>
+&nbsp;&nbsp;texture decoded to raw RGBA: 1024 × 1024 × 4 = 4 MB<br>
+On GPU upload:<br>
+&nbsp;&nbsp;geometry: 15-20 MB<br>
+&nbsp;&nbsp;texture: 4 MB + <a href="https://en.wikipedia.org/wiki/Mipmap">mipmaps</a> (+33%) ≈ 5.3 MB<br>
+&nbsp;&nbsp;VRAM total: ~20-25 MB<br>
+The CPU-side copy is retained by default in three.js (not auto-disposed), so add another ~20-25 MB of CPU RAM on top.</p>
+
+<br><br>
+
+<p><span style="color:red;">(3)</span> One 8K <a href="https://github.khronos.org/KTX-Specification/">UASTC</a> atlas in VRAM: 8192 × 8192 × 1 byte = 64 MB.<br>
+With mipmaps (+33%): ~85 MB.<br>
+85 MB / 34 projects ≈ 2.5 MB per project.</p>
+
+<br><br>
+
+<p><span style="color:red;">(4)</span> The /34 factor comes from atlas packing: a new atlas is only needed every 34 projects. In between, adding a project adds no draw call, no shader compile, and no texture upload — just more sub-rectangles of an existing texture. → amortized cost.</p>
+
+<br><br>
+
+<p><span style="color:red;">(5)</span> Standard PNG, JPG, and WebP files must be fully decompressed to RGBA (four times their on-disk size) before being uploaded to GPU VRAM. The KTX2 container does not need to be decompressed and is parsed natively in VRAM. <a href="https://learn.microsoft.com/en-us/windows/win32/direct3d11/bc7-format">BC7</a> is one such GPU-native block-compressed format that KTX2 can carry.</p>
+
+<br><br>
+
+<p>Only time will tell whether this scaling graph holds up ¯\_(ツ)_/¯</p>
+
+<br><br>
+
+<p>In conclusion, using 3D models can become a serious memory hog even with only a few projects, as filesize scales linearly with project count — and since models are large, they scale large. Textures are small, so they scale small.</p>
+
+<div style="text-align:center;">
+      <br>
+      |<br>|<br>V
+      <br><br><br>
+</div>
+
+  </div>
+</div>

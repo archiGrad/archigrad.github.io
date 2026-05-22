@@ -1,0 +1,80 @@
+what?
+
+archigrad.io is our 2.5d project visualizer and organizer. think of it as 
+a folder structure containing organized projects:
+
+commisioned_projects > projects_2026 > project_A > drawings > ...
+                     > projects_2025 > ...       > models   > context_models
+                     > .....                                > detail_models > model_1
+                                                                            > model_2
+
+this is our ACTUAL working directory. when we update a project, this 
+platform changes too. (there are things you can't see, of course.)
+
+it's our presentation, visualization, categorization and organization 
+tool all at once — built for us, opened up for you to look at.
+
+
+why 2.5?
+
+we love 3d, but 3d has a performance cap on the web. a single complex 
+model can hit 1M+ vertices, 50mb+ with all attributes (UVs, vertex 
+color, animation). many projects means linear growth in bytes — a 
+memory hog fast.
+
+compression helps but doesn't solve it:
+- draco/glb shrinks transfer size, but the mesh still decompresses 
+  on the CPU before GPU upload. VRAM footprint is unchanged — only 
+  loading is faster.
+- textures behave the same way. a 10mb webp/png/jpg decodes to ~40mb 
+  in VRAM (raw RGBA). decimation reduces polys but also reduces detail.
+- the 3d pipeline is rigid. changing anything means going back to 
+  the source model. not future-proof. not lazy-friendly.
+
+besides — the drawing has always been 2d. plan, section, elevation: 
+architecture's primary medium for 500+ years. 3d surfaces are nice, 
+but sections are better.
+
+
+so: what if everything becomes a texture?
+
+skip vertices, just pixels. now we are:
+- unconstrained by vertex count (any model slices onto the same 
+  texture resolution)
+- able to use KTX2, which stays GPU-compressed in VRAM (biggest 
+  win — sampled natively, no decode step)
+- able to pack 10+ models onto a single spritesheet
+
+result: project count scales sublinearly with total bytes. adding 
+more projects barely adds weight, because compression dominates 
+the added pixel area.
+
+bonus — full 2d control after the fact. don't like something? 
+paint over it. blend, subtract, multiply, dither, sharpen, manually 
+edit. 2d post-processing is easy and fun.
+
+the downside: we deliberately lose a dimension, and initial load 
+can exceed 20mb. a level-of-detail system loads low-res spritesheets 
+first — that's why it looks pixelated on load.
+
+
+how?
+
+a houdini pipeline slices and renders anything — static or animated, 
+textures, objects, volumes, VDBs, Coons surfaces, beziers. an 
+accompanying data file tells the platform how each slice should be 
+interpreted. three.js loads the spritesheets and assembles them.
+
+vertices    →  pixels
+pixels      →  slices
+slices      →  spritesheets
+spritesheets + data file  →  stacks (via three.js)
+stacks      →  groups
+groups      →  the folder hierarchy you see
+
+
+how to navigate
+
+desktop: breadcrumbs, arrows, the draggable folder tree, or the 
+3d nav UI on each stack.
+mobile: arrows, draggable tree, or the 3d nav UI (no breadcrumbs).

@@ -1,0 +1,122 @@
+<div class="text_center_fullscreen">
+    <div class="home_inner">
+      <br>
+        <div style="font-size:1.5em;">To our dearest visitor,</div><br><br>
+        <span style="display:inline-block;vertical-align:top;">we are archiGrad.io,</span> <span style="display:inline-block;vertical-align:top;">A 40 MHz,<br>high throughput,<br>low latency, <br> international office for digital and physical architecture.</span><br><br>
+      archiGrad stands for: <br>
+      Architecture [<span class="sw" data-pool="ops" data-color="white"></span>] gradients [<span class="sw" data-pool="grads" data-color="white"></span>]<br><br>
+      horizon and dimension free.<br><br><br>
+      
+      
+      (seatbelts required.)<br><br>
+  
+      Sampled from Bangkok's finest:<br><br><br><br>
+      <div style="font-size:1.5em;">We are,</div><br><br>
+      pixel farmers and slop tracers,<br>
+      <span class="sw" data-a="fast and stochastic" data-b="slow and deterministic" data-sep="&gt;" data-min="3" data-max="5" data-color="white"></span>,<br>
+      <span class="sw" data-a="eclectic" data-b="esoteric" data-sep="&gt;" data-min="2" data-max="10" data-color="white"></span><br>
+      corrosion resistant and fully dithered<br>
+      and always... 100% efficient<br><br>
+      &lt;&lt;Ouroboros, the self referential&gt;&gt;<br>
+      &lt;&lt;lazy like a fox&gt;&gt;<br><br><br><br>
+  
+      <div style="font-size:1.5em;">We choose,</div><br><br>
+      <span class="sw" data-a="pixels" data-b="points" data-sep="&gt;" data-min="5" data-max="30" data-color="white"></span>,<br>
+      <span class="sw" data-a="gradients" data-b="grids" data-sep="&gt;" data-min="2" data-max="10" data-color="white"></span>,<br>
+      <span class="sw" data-a="contours" data-b="terrains" data-sep="&gt;" data-min="1" data-max="5" data-color="white"></span>,<br>
+      <span class="sw" data-a="PLAY" data-b="WORK" data-sep="&gt;" data-min="1" data-max="10" data-color="white"></span>,<br>
+      <span class="sw" data-a="SLAP" data-b="SLOP" data-sep="&gt;" data-min="2" data-max="5" data-color="white"></span>,<br>
+      <span class="sw" data-a="scraping" data-b="scrolling" data-sep="&gt;" data-min="2" data-max="10" data-color="white"></span>,<br>
+      <span class="sw" data-a="synthetic" data-b="artificial" data-sep="&gt;" data-min="1" data-max="2" data-color="white"></span>,<br>
+      <span class="sw" data-a="authentic submissions" data-b="corpo competitions" data-sep="&gt;" data-min="10" data-max="14" data-color="white"></span>,<br>
+      <span class="sw" data-a="agency" data-b="agents" data-sep="&gt;" data-min="6" data-max="8" data-color="white"></span>,<br>
+      <span class="sw" data-a="performance" data-b="performative" data-sep="?" data-min="2" data-max="10" data-color="white"></span>,<br>
+      <span class="sw" data-a="RGBA" data-b="CMYK" data-sep="&gt;" data-min="1" data-max="5" data-color="white"></span>,<br>
+      <span class="sw" data-a="arithmetic" data-b="algorithmic" data-sep="&gt;" data-min="2" data-max="5" data-color="white"></span>,<br>
+      <span class="sw" data-a="tangible artifact" data-b="residual reference" data-sep="&gt;" data-min="1" data-max="5" data-color="white"></span><br><br>
+  
+      <span class="sw" data-a="making" data-b="thinking" data-sep="=" data-min="3" data-max="6" data-color="red"></span>,<br>
+      but most importantly,<br>
+      architecture is everything BUT architecture <br>
+      P ≠ NP.<br>
+      :<br>
+      &gt;<br>
+      crafted with love,<br>
+      yours truly,<br>
+      archiGrad.io<br>
+      &lt;
+    </div>
+  </div>
+
+
+
+
+
+
+  
+  
+ <script>
+  (() => {
+    const pools = {
+      ops: ['=', '-', '+'],
+      grads: ['ascend and descend', 'valleys and peaks', 'mountains and creeks', 'locals and globals']
+    };
+
+    function rand(min, max) {
+      return min + Math.random() * (max - min);
+    }
+
+    function startPoolSwap(span) {
+      const pool = pools[span.dataset.pool];
+      let current = pool[Math.floor(Math.random() * pool.length)];
+      span.textContent = current;
+      function swap() {
+        const filtered = pool.filter(w => w !== current);
+        current = filtered[Math.floor(Math.random() * filtered.length)];
+        span.textContent = current;
+        setTimeout(swap, rand(0.05, 3) * 1000);
+      }
+      setTimeout(swap, rand(0.05, 3) * 1000);
+    }
+
+    function startPairSwap(span) {
+      const a = span.dataset.a;
+      const b = span.dataset.b;
+      const sep = span.dataset.sep;
+      const min = parseFloat(span.dataset.min);
+      const max = parseFloat(span.dataset.max);
+      const lo = 1, hi = 30;
+      const stepMs = 40;
+      let count = Math.floor(rand(lo, hi));
+      let target = Math.floor(rand(lo, hi));
+      function render() {
+        span.textContent = `${a} ${sep.repeat(count)} ${b}`;
+      }
+      render();
+      function step() {
+        if (count === target) {
+          setTimeout(() => {
+            target = Math.floor(rand(lo, hi));
+            step();
+          }, rand(min, max) * 1000);
+          return;
+        }
+        count += count < target ? 1 : -1;
+        render();
+        setTimeout(step, stepMs);
+      }
+      setTimeout(step, stepMs);
+    }
+
+    document.querySelectorAll('.sw').forEach(span => {
+      if (span.dataset.pool) {
+        if (!pools[span.dataset.pool]) return;
+        if (span.dataset.color) span.style.color = span.dataset.color;
+        startPoolSwap(span);
+      } else if (span.dataset.a) {
+        if (span.dataset.color) span.style.color = span.dataset.color;
+        startPairSwap(span);
+      }
+    });
+  })();
+</script>

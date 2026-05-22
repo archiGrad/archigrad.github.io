@@ -1,0 +1,71 @@
+<div class="text_center_fullscreen">
+  <div class="home_inner">
+    <br>
+    <div style="font-size:1.5em;">To our dearest visitor,</div><br><br>
+    <span style="display:inline-block;vertical-align:top;">we are archiGrad.io,</span> <span style="display:inline-block;vertical-align:top;">high throughput,<br>low latency, <br> international office for digital and physical architecture.</span><br><br>
+    archiGrad stands for: <br>
+    Architecture [<span class="sw" data-pool="ops" data-color="white"></span>] gradients [<span class="sw" data-pool="grads" data-color="white"></span>]<br><br>
+    horizon and dimension free.<br><br><br>
+
+    (seatbelts required.)<br><br>
+
+    Sampled from Bangkok's finest:<br>
+
+    <div style="text-align:center;">
+      <br>
+      |<br>|<br>V
+      <br><br><br>
+    </div>
+  </div>
+</div>
+
+<script>
+  (() => {
+    const pools = {
+      ops: ['AND', 'OR', 'NOT','EQUALS'],
+      grads: ['ascend and descend', 'valleys and peaks', 'mountains and creeks', 'locals and globals']
+    };
+    function rand(min, max) { return min + Math.random() * (max - min); }
+    function startPoolSwap(span) {
+      const pool = pools[span.dataset.pool];
+      let current = pool[Math.floor(Math.random() * pool.length)];
+      span.textContent = current;
+      function swap() {
+        const filtered = pool.filter(w => w !== current);
+        current = filtered[Math.floor(Math.random() * filtered.length)];
+        span.textContent = current;
+        setTimeout(swap, rand(0.05, 3) * 1000);
+      }
+      setTimeout(swap, rand(0.05, 3) * 1000);
+    }
+    function startPairSwap(span) {
+      const a = span.dataset.a, b = span.dataset.b, sep = span.dataset.sep;
+      const min = parseFloat(span.dataset.min), max = parseFloat(span.dataset.max);
+      const lo = 1, hi = 30, stepMs = 40;
+      let count = Math.floor(rand(lo, hi));
+      let target = Math.floor(rand(lo, hi));
+      function render() { span.textContent = `${a} ${sep.repeat(count)} ${b}`; }
+      render();
+      function step() {
+        if (count === target) {
+          setTimeout(() => { target = Math.floor(rand(lo, hi)); step(); }, rand(min, max) * 1000);
+          return;
+        }
+        count += count < target ? 1 : -1;
+        render();
+        setTimeout(step, stepMs);
+      }
+      setTimeout(step, stepMs);
+    }
+    document.querySelectorAll('.sw').forEach(span => {
+      if (span.dataset.pool) {
+        if (!pools[span.dataset.pool]) return;
+        if (span.dataset.color) span.style.color = span.dataset.color;
+        startPoolSwap(span);
+      } else if (span.dataset.a) {
+        if (span.dataset.color) span.style.color = span.dataset.color;
+        startPairSwap(span);
+      }
+    });
+  })();
+</script>
