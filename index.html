@@ -2,6 +2,7 @@
 <html>
 <head>
 <link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="annotation_styles.css">
 <script src="https://unpkg.com/stats.js@0.17.0/build/stats.min.js"></script>
             
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
@@ -11,19 +12,19 @@
 
 </head>
 <body>
-<div id="tree">
-    <div id="tree-toolbar" style="display:flex;align-items:center;margin-bottom:6px;">
+<div id="tree"  style="left:-9999px;top:-9999px;">
+     <div id="tree-toolbar" style="display:flex;align-items:center;margin-bottom:6px;">
         <input id="tree-search" type="text" placeholder="search..." />
         <span id="nav-back">&lt;</span>
         <span id="nav-fwd">&gt;</span>
         <span id="tree-expand-all">+</span>
-    </div>
+    </div> 
     <div id="tree-content"></div>
-    <div id="tree-legend">
+    <!-- <div id="tree-legend">
         <span><span style="color:#4f4;">●</span> text_stop</span>
         <span><span style="color:#f44;">●</span> text_hard_stop</span>
         <span><span style="color:#fff;">●</span> text page</span>
-    </div>
+    </div> -->
     <div id="debug-section" style="display:none;">
         <div id="debug-section-title">debug (d)</div>
         <label class="debug-row">
@@ -49,6 +50,8 @@ import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { Line2 } from 'three/addons/lines/Line2.js';
 import { LineMaterial } from 'three/addons/lines/LineMaterial.js';
 import { LineGeometry } from 'three/addons/lines/LineGeometry.js';
+import { LineSegments2 } from 'three/addons/lines/LineSegments2.js';
+import { LineSegmentsGeometry } from 'three/addons/lines/LineSegmentsGeometry.js';
 THREE.ColorManagement.enabled = false;
 
 (() => {
@@ -93,7 +96,7 @@ THREE.ColorManagement.enabled = false;
 
     function clearSearch() {
         visibleMatches.forEach(l => l.style.background = '');
-        activeScenes.forEach(s => { if (s.clearWireNav) s.clearWireNav(); });
+        activeScenes.forEach(s => { if (s.clearWireNav) s.clearWireNav(); if (s.clearHover) s.clearHover(); });
         searchInput.value = ''; tabIndex = -1;
         treeContent.querySelectorAll('.tree-item').forEach(el => el.style.display = '');
         treeContent.querySelectorAll('.tree-children').forEach(el => el.style.display = 'none');
@@ -103,9 +106,9 @@ THREE.ColorManagement.enabled = false;
     function highlightMatch(idx) {
         visibleMatches.forEach(l => l.style.background = '');
         if (idx >= 0 && idx < visibleMatches.length) {
-            visibleMatches[idx].style.background = '#333';
+            visibleMatches[idx].style.background = ACCENT_B;
             const p = visibleMatches[idx].dataset.path;
-            if (p) activeScenes.forEach(s => { if (s.driveWireNav) s.driveWireNav(p); });
+            if (p) activeScenes.forEach(s => { if (s.driveWireNav) s.driveWireNav(p); if (s.driveHover) s.driveHover(p); });
             const item = visibleMatches[idx].closest('.tree-item');
             if (item) {
                 const top = item.offsetTop, bot = top + item.offsetHeight;
@@ -113,7 +116,7 @@ THREE.ColorManagement.enabled = false;
                 else if (top < treeContent.scrollTop) treeContent.scrollTop = top;
             }
         } else {
-            activeScenes.forEach(s => { if (s.clearWireNav) s.clearWireNav(); });
+            activeScenes.forEach(s => { if (s.clearWireNav) s.clearWireNav(); if (s.clearHover) s.clearHover(); });
         }
     }
 
@@ -192,7 +195,7 @@ THREE.ColorManagement.enabled = false;
 const loader = document.createElement('div');
 loader.id = 'loader';
 loader.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:black;color:white;display:flex;align-items:center;justify-content:center;z-index:99999;font-family:monospace;';
-loader.textContent = 'initializing...';
+loader.textContent = 'compiling archive...';
 document.body.appendChild(loader);
 
             
@@ -211,6 +214,17 @@ const _gridOrder = Array.from({length: GRID_TOTAL}, (_, i) => i);
 })(_gridOrder);
 
 let progress = {ss: 0, ssTotal: 0, stacks: 0, stacksTotal: 0, imgs: 0, imgsTotal: 0};
+const ACCENT = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim() || '#44f';
+const ACCENT_B = getComputedStyle(document.documentElement).getPropertyValue('--accent-b').trim() || '#222';
+const BG = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || 'black';
+const TEXT = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || 'white';
+const TEXT_DIM = getComputedStyle(document.documentElement).getPropertyValue('--text-dim').trim() || '#444';
+const TEXT_MUTED = getComputedStyle(document.documentElement).getPropertyValue('--text-muted').trim() || '#555';
+const LABEL_DIM_OPACITY = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--label-dim-opacity')) || 0.2;
+const LABEL_PADDING = getComputedStyle(document.documentElement).getPropertyValue('--label-padding').trim() || '2px 4px';
+const WIRE_CURVE_RADIUS_SOURCE = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--wire-curve-radius-source')) || 12;
+const WIRE_CURVE_RADIUS_TARGET = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--wire-curve-radius-target')) || 12;
+const WIRE_CORNER_POSITION = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--wire-corner-position')) || 0.5;
 
 function makeGrid(percent) {
     const filled = Math.floor((percent / 100) * GRID_TOTAL);
@@ -240,13 +254,12 @@ function updateLoader() {
         <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:24px;">
             <div>
                 <div style="margin-bottom:4px;">archigrad.io</div>
-                <div>office for architecture and computation</div>
+                <div>Office for digital and physical architecture. Thank you for visiting!</div>
             </div>
             <div style="text-align:right;">
-                <a href="https://github.com/archiGrad" target="_blank" style="${linkStyle}">github</a>
-                <a href="#" style="${linkStyle}">whatsapp</a>
-                <a href="#" style="${linkStyle}">line</a>
-                <a href="mailto:putteneersjoris@gmail.com" style="${linkStyle}">email</a>
+                <a href="https://www.instagram.com/archigrad.io/" target="_blank" style="${linkStyle}">instagram</a>
+                <a href="https://github.com/archiGrad" target="_blank" style="${linkStyle}">github</a><br><br>
+                contact: <a href="mailto:hello@archigrad.io" style="${linkStyle}">hello@archigrad.io</a>
             </div>
         </div>
         <div style="display:flex;gap:24px;">
@@ -294,11 +307,171 @@ function seededRandom(seed) {
     return state / 4294967296;
 }
 
+function convexHull2D(pts) {
+    const n = pts.length;
+    if (n < 3) return pts.slice();
+    const sorted = pts.slice().sort((a, b) => a[0] === b[0] ? a[1] - b[1] : a[0] - b[0]);
+    const cross = (o, a, b) => (a[0]-o[0])*(b[1]-o[1]) - (a[1]-o[1])*(b[0]-o[0]);
+    const lower = [];
+    for (const p of sorted) {
+        while (lower.length >= 2 && cross(lower[lower.length-2], lower[lower.length-1], p) <= 0) lower.pop();
+        lower.push(p);
+    }
+    const upper = [];
+    for (let i = sorted.length - 1; i >= 0; i--) {
+        const p = sorted[i];
+        while (upper.length >= 2 && cross(upper[upper.length-2], upper[upper.length-1], p) <= 0) upper.pop();
+        upper.push(p);
+    }
+    lower.pop(); upper.pop();
+    return lower.concat(upper);
+}
+
+// Create an SVG element with attributes. Style/class also accepted.
+function svgEl(tag, attrs) {
+    const e = document.createElementNS('http://www.w3.org/2000/svg', tag);
+    if (attrs) for (const k in attrs) {
+        if (k === 'class') e.setAttribute('class', attrs[k]);
+        else if (k === 'style') Object.assign(e.style, attrs[k]);
+        else e.setAttribute(k, attrs[k]);
+    }
+    return e;
+}
+
 function seededColorFromPath(path) {
     const hash = path.split('').reduce((a, c) => a + c.charCodeAt(0), 0);
     let state = hash * spriteConfig.seed;
     function next() { state = (state * 1664525 + 1013904223) % 4294967296; return state / 4294967296; }
     return `hsl(${Math.floor(next() * 360)},${60 + Math.floor(next() * 30)}%,${50 + Math.floor(next() * 20)}%)`;
+}
+
+// ============================================================
+// Color system: depth-driven palette per top-level content branch.
+// Public API: computePathColors(root), pathColor(path).
+// ============================================================
+const _PALETTE = [
+    [0, 0, 255],    [255, 0, 0],    [0, 255, 0],    [255, 255, 0],
+    [255, 128, 0],  [255, 0, 255],  [0, 255, 255],  [128, 0, 255]
+];
+const _pathColors = {};
+
+function _hsl2rgb(h, s, l) {
+    h = ((h % 360) + 360) % 360 / 360;
+    if (s === 0) { const v = Math.round(l * 255); return [v, v, v]; }
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s;
+    const p = 2 * l - q;
+    const f = (t) => {
+        if (t < 0) t += 1; else if (t > 1) t -= 1;
+        if (t < 1/6) return p + (q - p) * 6 * t;
+        if (t < 1/2) return q;
+        if (t < 2/3) return p + (q - p) * (2/3 - t) * 6;
+        return p;
+    };
+    return [Math.round(f(h + 1/3) * 255), Math.round(f(h) * 255), Math.round(f(h - 1/3) * 255)];
+}
+
+function _rgb2hue(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    const max = Math.max(r, g, b), min = Math.min(r, g, b);
+    if (max === min) return 0;
+    const d = max - min;
+    let h;
+    if (max === r) h = (g - b) / d + (g < b ? 6 : 0);
+    else if (max === g) h = (b - r) / d + 2;
+    else h = (r - g) / d + 4;
+    return h * 60;
+}
+
+// Build "rgb(...)" color: lerp from black (t=0) to palette color (t=1), optionally hue-jitter.
+function _buildColor(paletteIdx, t, jitter) {
+    if (paletteIdx < 0) return 'rgb(0,0,0)';
+    const base = _PALETTE[paletteIdx];
+    let r = Math.round(base[0] * t), g = Math.round(base[1] * t), b = Math.round(base[2] * t);
+    if (Math.abs(jitter) >= 0.5 && t >= 0.3) {
+        // Rotate hue by jitter degrees while preserving lightness/saturation
+        const max = Math.max(r, g, b), min = Math.min(r, g, b);
+        const l = (max + min) / 2 / 255;
+        const s = max === min ? 0 : (l > 0.5 ? (max - min) / (510 - max - min) : (max - min) / (max + min));
+        [r, g, b] = _hsl2rgb(_rgb2hue(r, g, b) + jitter, s, l);
+    }
+    return `rgb(${r},${g},${b})`;
+}
+
+// Post-order: returns { hasContent, maxDepth } for the subtree rooted at node.
+// hasContent: true if any descendant has images. maxDepth: deepest level below node.
+function _subtreeStats(node) {
+    let hasContent = !!(node.ai && node.ai.length > 0);
+    let maxDepth = 0;
+    if (node.children) {
+        for (const c of node.children) {
+            const s = _subtreeStats(c);
+            if (s.hasContent) hasContent = true;
+            if (s.maxDepth + 1 > maxDepth) maxDepth = s.maxDepth + 1;
+        }
+    }
+    return { hasContent, maxDepth };
+}
+
+// Recursively assign colors to all descendants of `node` in one branch.
+function _colorBranch(node, paletteIdx, depth, branchMaxDepth, jitter) {
+    if (node.path) {
+        const t = branchMaxDepth > 0 ? depth / branchMaxDepth : 0;
+        _pathColors[node.path] = _buildColor(paletteIdx, t, jitter);
+    }
+    if (!node.children || node.children.length === 0) return;
+    const sorted = node.children.slice().sort((a, b) => (a.path || '').localeCompare(b.path || ''));
+    const n = sorted.length;
+    for (let i = 0; i < n; i++) {
+        const sib = n === 1 ? 0 : -5 + i * (10 / (n - 1));
+        _colorBranch(sorted[i], paletteIdx, depth + 1, branchMaxDepth, jitter + sib);
+    }
+}
+
+// Assign black to entire subtree (for non-content branches).
+function _colorDark(node) {
+    if (node.path) _pathColors[node.path] = 'rgb(0,0,0)';
+    if (node.children) for (const c of node.children) _colorDark(c);
+}
+
+function computePathColors(rootNode) {
+    if (!rootNode) return;
+    for (const k in _pathColors) delete _pathColors[k];
+    // Cache stats per node for this pass (no mutation: WeakMap)
+    const statsCache = new WeakMap();
+    const stats = (n) => {
+        if (statsCache.has(n)) return statsCache.get(n);
+        const s = _subtreeStats(n);
+        statsCache.set(n, s);
+        return s;
+    };
+    // Walk down through single-content chain (skip subtrees with no images)
+    let cur = rootNode;
+    const chain = [rootNode.path || '(root)'];
+    if (rootNode.path) _pathColors[rootNode.path] = 'rgb(0,0,0)';
+    while (cur && cur.children && cur.children.length > 0) {
+        const contentful = cur.children.filter(c => stats(c).hasContent);
+        if (contentful.length === 0) break;
+        if (contentful.length > 1) break;
+        for (const c of cur.children) if (c !== contentful[0]) _colorDark(c);
+        cur = contentful[0];
+        if (cur.path) _pathColors[cur.path] = 'rgb(0,0,0)';
+        chain.push(cur.path || '(?)');
+    }
+    if (!cur || !cur.children || cur.children.length === 0) {
+        return;
+    }
+    const all = cur.children.slice().sort((a, b) => (a.path || '').localeCompare(b.path || ''));
+    const branches = all.filter(c => stats(c).hasContent);
+    for (const c of all) if (!stats(c).hasContent) _colorDark(c);
+    for (let i = 0; i < branches.length; i++) {
+        const paletteIdx = i % _PALETTE.length;
+        const maxDepth = stats(branches[i]).maxDepth + 1;
+        _colorBranch(branches[i], paletteIdx, 1, maxDepth, 0);
+    }
+}
+
+function pathColor(path) {
+    return _pathColors[path] || 'rgb(0,0,0)';
 }
 
 function buildHtmlDots(atArray, sizeClass) {
@@ -327,12 +500,12 @@ function breadcrumbHtml(path, activePath) {
     const parts = path.split('/');
     return parts.map((part, idx) => {
         const partPath = parts.slice(0, idx + 1).join('/');
-        const color = (activePath && partPath === activePath) ? '#44f' : 'white';
+        const color = (activePath && partPath === activePath) ? ACCENT : TEXT;
         const pNode = findNodeByPath(dataTree, partPath);
         const acc = spriteConfig.show_nav_accessories;
         const deco = acc ? navDeco(pNode, 'dot-md', spriteConfig.breadcrumb_html_dots) : '';
         return `<span style="color:${color};cursor:pointer" data-path="${partPath}">${part}${deco}</span>`;
-    }).join(' <span style="color:white">&gt;</span> ');
+    }).join(` <span style="color:${TEXT}">&gt;</span> `);
 }
 
 function rebaseHtmlSrc(html, htmlPath) {
@@ -483,6 +656,7 @@ fetch('data.json')
         const db = d.database;
         dataTree = d.tree;
         spriteConfig = d.sprite_config;
+        window.folderAnnotations = d.folder_annotations || {};
 
         function hydrate(node) {
             if (node.ai) node.ai = node.ai.map(id => db[id]);
@@ -491,6 +665,7 @@ fetch('data.json')
         }
         hydrate(dataTree);
         precomputeCounts(dataTree);
+        computePathColors(dataTree);
 
         buildTree(dataTree, document.getElementById('tree-content'));
         progress = {ss: 0, ssTotal: 0, stacks: 0, stacksTotal: 0, imgs: 0, imgsTotal: 0};
@@ -581,7 +756,7 @@ function buildTree(node, container, depth = 0, isLast = true, prefix = '') {
     
     if (node.hid) {
         link.style.textDecoration = 'line-through';
-        link.style.color = '#666';
+        link.style.color = TEXT_MUTED;
         link.style.cursor = 'not-allowed';
         link.title = 'Hidden';
     } else {
@@ -594,11 +769,11 @@ function buildTree(node, container, depth = 0, isLast = true, prefix = '') {
         };
         link.addEventListener('mouseenter', () => {
             if (window.innerWidth <= 768) return;
-            activeScenes.forEach(s => { if (s.driveWireNav) s.driveWireNav(node.path); });
+            activeScenes.forEach(s => { if (s.driveWireNav) s.driveWireNav(node.path); if (s.driveHover) s.driveHover(node.path); });
         });
         link.addEventListener('mouseleave', () => {
             if (window.innerWidth <= 768) return;
-            activeScenes.forEach(s => { if (s.clearWireNav) s.clearWireNav(); });
+            activeScenes.forEach(s => { if (s.clearWireNav) s.clearWireNav(); if (s.clearHover) s.clearHover(); });
         });
     }
     
@@ -639,10 +814,10 @@ function updateTreeState(expand) {
             if (cc) cc.style.display = 'block';
         }
         let color;
-        if (link.style.textDecoration === 'line-through') color = '#666';
-        else if (p === currentNode.path) color = '#44f';
-        else if (ancestorSet.has(p) || descendantSet.has(p)) color = 'white';
-        else color = '#444';
+        if (link.style.textDecoration === 'line-through') color = TEXT_MUTED;
+        else if (p === currentNode.path) color = ACCENT;
+        else if (ancestorSet.has(p) || descendantSet.has(p)) color = TEXT;
+        else color = TEXT_DIM;
         link.style.color = color;
         const countSpan = link.querySelector('.tree-count');
         if (countSpan) countSpan.style.color = color;
@@ -956,7 +1131,8 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
             if (!wireframe) {
                 const wGeo = new LineGeometry();
                 wGeo.setPositions(pts);
-                const wMat = new LineMaterial({ color: "blue", linewidth: 2 });
+                const wMat = new LineMaterial({ color: ACCENT, linewidth: 2 });
+                wMat.color.convertSRGBToLinear();
                 wMat.resolution.set(container.clientWidth, container.clientHeight);
                 wireframe = new Line2(wGeo, wMat);
                 wireframe.renderOrder = 999;
@@ -1020,6 +1196,8 @@ async function createThreeScene(container, images, node, highlightPath) {
     const SEED = spriteConfig.seed;
     const ORDERED_GRID_LAYOUT = spriteConfig.ordered_grid_layout;
     const ROTATION_SPEED = spriteConfig.rotation_speed;
+    const SHOW_HOVER_3D_BOX = window.matchMedia('(max-width: 768px)').matches ? false : true;  // toggle 3D bounding box on hover
+            
 
     const RANDOM_IMAGE_ROTATION = node.rir != null ? node.rir : spriteConfig.random_image_rotation;
     const DISCRETE_IMAGE_ROTATION = node.dir != null ? node.dir : spriteConfig.discrete_image_rotation;
@@ -1326,7 +1504,7 @@ async function createThreeScene(container, images, node, highlightPath) {
     });
     renderer.setSize(container.clientWidth, container.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.setClearColor(0x000000);
+    renderer.setClearColor(BG);
     initKTX2(renderer);
 
     const spriteBgEnabled = node.sbg != null ? node.sbg : spriteConfig.sprite_bg;
@@ -1348,7 +1526,6 @@ async function createThreeScene(container, images, node, highlightPath) {
         const localSpacing = (folderNode && folderNode.msp != null) ? folderNode.msp : STACK_SPACING;
         
         maxStackHeight = Math.max(maxStackHeight, grouped[folder].length * localSpacing);
-        console.log(folder, grouped[folder].length, 'h:', grouped[folder].length * localSpacing);
 
             
     });
@@ -1368,19 +1545,40 @@ async function createThreeScene(container, images, node, highlightPath) {
     wireSvg.style.overflow = 'visible';
     container.appendChild(wireSvg);
     function makeSvgPath(cls) { const p = document.createElementNS('http://www.w3.org/2000/svg', 'path'); p.classList.add(cls); wireSvg.appendChild(p); return p; }
-    const wirePathDim = makeSvgPath('nav-wire-path-dim');
-    const wirePathAncestor = makeSvgPath('nav-wire-path-ancestor');
-    const wirePath = makeSvgPath('nav-wire-path');
+    const wirePathDim = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    wirePathDim.classList.add('nav-wire-path-dim-group');
+    wireSvg.appendChild(wirePathDim);
+    const wirePathAncestor = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    wirePathAncestor.classList.add('nav-wire-path-ancestor-group');
+    wireSvg.appendChild(wirePathAncestor);
+    const wirePath = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    wirePath.classList.add('nav-wire-path-group');
+    wireSvg.appendChild(wirePath);
     const wireArrowG = document.createElementNS('http://www.w3.org/2000/svg', 'g');
     wireSvg.appendChild(wireArrowG);
-    let mouseX = 0, mouseY = 0, mouseIsDown = false;
+    // Hover bbox: dimming overlay with mask cut out by convex hulls
+    const hoverMaskId = 'hover-bbox-mask-' + Math.random().toString(36).slice(2, 10);
+    const hoverBoxG = svgEl('g', { class: 'hover-bbox-group' });
+    const hoverMask = svgEl('mask', { id: hoverMaskId, maskUnits: 'userSpaceOnUse' });
+    hoverMask.appendChild(svgEl('rect', { x: 0, y: 0, width: '100%', height: '100%', fill: 'white' }));
+    hoverMask.appendChild(hoverBoxG);
+    const hoverDefs = svgEl('defs');
+    hoverDefs.appendChild(hoverMask);
+    wireSvg.appendChild(hoverDefs);
+    const hoverDim = svgEl('rect', {
+        x: 0, y: 0, width: '100%', height: '100%',
+        class: 'hover-bbox-dim', mask: 'url(#' + hoverMaskId + ')',
+        style: { display: 'none' }
+    });
+    wireSvg.appendChild(hoverDim);
+    const hoverHullG = svgEl('g', { class: 'hover-hull-group' });
+    wireSvg.appendChild(hoverHullG);
+    // Three.js Box3 helpers (3D, occluded by geometry)
+    const hoverBoxHelperGroup = new THREE.Group();
+    scene.add(hoverBoxHelperGroup);
+    let mouseIsDown = false;
     document.addEventListener('pointerdown', (e) => { if (e.button === 0 || e.button === 1) mouseIsDown = true; });
     document.addEventListener('pointerup', (e) => { if (e.button === 0 || e.button === 1) mouseIsDown = false; });
-    container.addEventListener('mousemove', (e) => {
-        const rect = container.getBoundingClientRect();
-        mouseX = e.clientX - rect.left;
-        mouseY = e.clientY - rect.top;
-    });
 
  
     const toggleBtn = document.createElement('span');
@@ -1413,9 +1611,13 @@ const updateCount = () => {
     updateCount();
 
     const stackLabels = [];
+    const annotationLabels = [];
+    const hoverBoxState = { activePath: null, groups: [] };
     let currentFocusedParent = null;
     let activeLabelPath = null;
     let activeGroupPath = null;
+    let selectedLabelPath = null;
+    let selectedRootGroupPath = null;
     function focusStackGroup(parentFolder) {
         if (currentFocusedParent === parentFolder) {
             unfocusAll();
@@ -1436,7 +1638,7 @@ const updateCount = () => {
             }
             stackLabels.forEach(sl => {
                 const match = sl.folderName.startsWith(parentFolder + '/') || sl.folderName === parentFolder;
-                sl.element.style.opacity = match ? '1.0' : String(STACK_DIM_OPACITY);
+                sl.element.style.opacity = match ? '1.0' : String(LABEL_DIM_OPACITY);
             });
             currentFocusedParent = parentFolder;
         }
@@ -1565,7 +1767,7 @@ const updateCount = () => {
                 }
             }
             scene.add(stackGroup);
-            stackGroups[folderName] = { group: stackGroup, materials: stackMaterials };
+            stackGroups[folderName] = { group: stackGroup, materials: stackMaterials, xPos, zPos };
 
             updateCount();
             loadedStacks++;
@@ -1676,7 +1878,7 @@ const updateCount = () => {
             stackLabels.forEach(sl => {
                 const isMatch = sl.folderName.startsWith(targetPath + '/') || sl.folderName === targetPath;
                 const isAncestor = targetPath.startsWith(sl.folderName + '/');
-                sl.element.style.opacity = (isMatch || isAncestor) ? '1.0' : String(STACK_DIM_OPACITY);
+                sl.element.style.opacity = (isMatch || isAncestor) ? '1.0' : String(LABEL_DIM_OPACITY);
             });
         }
 
@@ -1691,11 +1893,13 @@ const updateCount = () => {
 
         function setNavVisible(parentPath) {
             activeLabelPath = parentPath;
+            const grandparentPath = parentPath.includes('/') ? parentPath.slice(0, parentPath.lastIndexOf('/')) : '';
             stackLabels.forEach(sl => {
                 if (sl.isGroup) return;
                 const isDirectChild = sl.navParentPath === parentPath;
-                const isAncestorChild = parentPath.startsWith(sl.navParentPath + '/');
-                sl.navVisible = isDirectChild || isAncestorChild;
+                const isOnPath = parentPath === sl.folderName || parentPath.startsWith(sl.folderName + '/');
+                const isParentLevelSibling = grandparentPath && sl.navParentPath === grandparentPath;
+                sl.navVisible = isDirectChild || isOnPath || isParentLevelSibling;
             });
         }
 
@@ -1714,8 +1918,52 @@ const updateCount = () => {
             clearTreeHighlight();
         }
 
+        function applyLabelSelectedStyle(path) {
+            for (const sl of stackLabels) {
+                if (sl.element.classList.contains('label-selected') && sl.folderName !== path) {
+                    sl.element.classList.remove('label-selected');
+                }
+            }
+            if (!path) return;
+            for (const sl of stackLabels) {
+                if (sl.folderName === path) sl.element.classList.add('label-selected');
+            }
+        }
+
+        function applySelection(path, rootGroupPath) {
+            activeGroupPath = rootGroupPath;
+            setNavVisible(path);
+            applyDimming(path);
+            highlightTreePath(path);
+            applyLabelSelectedStyle(path);
+            setHoverBox(path);
+        }
+
+        function handleLabelClick(path, rootGroupPath) {
+            if (currentFocusedParent) return;
+            // Drill in only when:
+            //   1. clicking the same already-selected label, OR
+            //   2. clicking a STRICT ancestor of the current group (i.e., outside the current scene's top group)
+            const isSameSelected = path === selectedLabelPath;
+            const isStrictAncestorOfGroup = selectedRootGroupPath && selectedRootGroupPath.startsWith(path + '/');
+            if (isSameSelected || isStrictAncestorOfGroup) {
+                const clickedNode = findNodeByPath(dataTree, path);
+                if (clickedNode) renderContent(clickedNode);
+                return;
+            }
+            selectedLabelPath = path;
+            selectedRootGroupPath = rootGroupPath;
+            applySelection(path, rootGroupPath);
+        }
+
         function resetAll() {
             resetNav();
+            selectedLabelPath = null;
+            selectedRootGroupPath = null;
+            applyLabelSelectedStyle(null);
+            hoverBoxState.activePath = null;
+            hoverBoxState.groups = [];
+            disposeHoverRender();
             unfocusAll();
         }
 
@@ -1733,7 +1981,22 @@ const updateCount = () => {
 
         sceneData.clearWireNav = function() {
             if (currentFocusedParent) return;
-            resetNav();
+            if (selectedLabelPath) {
+                treeDrivenNav = false;
+                applySelection(selectedLabelPath, selectedRootGroupPath);
+            } else {
+                resetNav();
+            }
+        };
+
+        sceneData.driveHover = function(targetPath) {
+            if (currentFocusedParent || mouseIsDown) return;
+            setHoverBox(targetPath);
+        };
+
+        sceneData.clearHover = function() {
+            if (currentFocusedParent) return;
+            clearHoverBox();
         };
 
         document.addEventListener('keydown', (e) => { if (e.key === 'Escape') resetAll(); });
@@ -1748,73 +2011,199 @@ const updateCount = () => {
         });
 
         // Build a position tree from flat folder list per group
+        // Build a hierarchical position tree from flat stack folders.
+        // Each node tracks the tallest descendant stack (xPos, zPos, maxY).
         function buildPositionTree(folders, basePath) {
-            const root = { children: {}, path: basePath, maxY: 0, xPos: 0, zPos: 0 };
+            const root = { children: {}, path: basePath, maxY: -Infinity, xPos: 0, zPos: 0 };
             for (const f of folders) {
-                const sub = f.relPath.split('/').filter(p => p).slice(1);
+                const segments = f.relPath.split('/').filter(Boolean).slice(1);
                 let cur = root;
                 let curPath = basePath;
-                for (let i = 0; i < sub.length; i++) {
-                    curPath = curPath + '/' + sub[i];
-                    if (!cur.children[sub[i]]) {
-                        cur.children[sub[i]] = { children: {}, path: curPath, maxY: 0, xPos: f.xPos, zPos: f.zPos };
+                // Update root + every ancestor on the path with this leaf's height
+                if (f.topY > cur.maxY) { cur.maxY = f.topY; cur.xPos = f.xPos; cur.zPos = f.zPos; }
+                for (const seg of segments) {
+                    curPath = curPath + '/' + seg;
+                    let next = cur.children[seg];
+                    if (!next) {
+                        next = { children: {}, path: curPath, maxY: -Infinity, xPos: 0, zPos: 0 };
+                        cur.children[seg] = next;
                     }
-                    cur = cur.children[sub[i]];
-                }
-                if (f.topY > cur.maxY) {
-                    cur.maxY = f.topY;
-                    cur.xPos = f.xPos;
-                    cur.zPos = f.zPos;
+                    cur = next;
+                    if (f.topY > cur.maxY) { cur.maxY = f.topY; cur.xPos = f.xPos; cur.zPos = f.zPos; }
                 }
             }
-            function propagate(n) {
-                for (const child of Object.values(n.children)) {
-                    propagate(child);
-                    if (child.maxY > n.maxY) {
-                        n.maxY = child.maxY;
-                        n.xPos = child.xPos;
-                        n.zPos = child.zPos;
-                    }
-                }
-            }
-            propagate(root);
             return root;
+        }
+
+        // HOVER BBOX STATE
+        // 8 corners of a stack's grid-cell footprint, inflated outward by `margin` (world units).
+        // yMin/yMax cached on data; corners rebuilt per call.
+        function getGroupCorners(data, margin) {
+            if (data.yMax === undefined) {
+                const box = new THREE.Box3().setFromObject(data.group);
+                if (box.isEmpty()) return null;
+                data.yMax = box.max.y;
+                data.yMin = box.min.y;
+            }
+            const half = 0.5 + margin;
+            const xL = data.xPos - half, xR = data.xPos + half;
+            const zL = data.zPos - half, zR = data.zPos + half;
+            const y0 = data.yMin - margin, y1 = data.yMax + margin;
+            return [
+                new THREE.Vector3(xL, y0, zL), new THREE.Vector3(xR, y0, zL),
+                new THREE.Vector3(xL, y1, zL), new THREE.Vector3(xR, y1, zL),
+                new THREE.Vector3(xL, y0, zR), new THREE.Vector3(xR, y0, zR),
+                new THREE.Vector3(xL, y1, zR), new THREE.Vector3(xR, y1, zR)
+            ];
+        }
+
+        // Unit cube edges (1x1x1 centered at origin), built once and reused.
+        const _unitCubeEdgesGeo = new LineSegmentsGeometry().fromEdgesGeometry(
+            new THREE.EdgesGeometry(new THREE.BoxGeometry(1, 1, 1))
+        );
+
+        function rebuildBoxHelpers(branches, colorStr) {
+            while (hoverBoxHelperGroup.children.length > 0) {
+                const h = hoverBoxHelperGroup.children[0];
+                hoverBoxHelperGroup.remove(h);
+                if (h.material) h.material.dispose();
+            }
+            if (!SHOW_HOVER_3D_BOX) return;
+            const lw = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hover-3dbox-width')) || 3;
+            for (const cornerSets of Object.values(branches)) {
+                const box = new THREE.Box3();
+                for (const cs of cornerSets) for (const p of cs) box.expandByPoint(p);
+                if (box.isEmpty()) continue;
+                const mat = new LineMaterial({ color: colorStr, linewidth: lw });
+                mat.color.convertSRGBToLinear();
+                mat.resolution.set(container.clientWidth, container.clientHeight);
+                const line = new LineSegments2(_unitCubeEdgesGeo, mat);
+                box.getCenter(line.position);
+                box.getSize(line.scale);
+                line.renderOrder = 999;
+                line.frustumCulled = false;
+                hoverBoxHelperGroup.add(line);
+            }
+        }
+
+        // Resize an SVG container to hold exactly `count` <polygon> elements with the given class.
+        function syncPolyPool(container, count, cls) {
+            while (container.childElementCount < count) {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+                if (cls) p.classList.add(cls);
+                else p.setAttribute('fill', 'black');
+                container.appendChild(p);
+            }
+            while (container.childElementCount > count) {
+                container.removeChild(container.lastChild);
+            }
+        }
+
+        // Pure: scan stackGroups, group corners by immediate-child branch under `path`.
+        // Returns groups with two corner sets per branch: `corners` (margin-inflated, for hull)
+        // and `cornersInner` (no margin, for 3D box).
+        function computeHoverGroups(path) {
+            const margin = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--hover-hull-margin')) || 0;
+            const prefix = path + '/';
+            const branchesOuter = {};
+            const branchesInner = {};
+            const collect = (folder, branchKey) => {
+                const outer = getGroupCorners(stackGroups[folder], margin);
+                const inner = getGroupCorners(stackGroups[folder], 0);
+                if (!outer || !inner) return;
+                if (!branchesOuter[branchKey]) { branchesOuter[branchKey] = []; branchesInner[branchKey] = []; }
+                branchesOuter[branchKey].push(outer);
+                branchesInner[branchKey].push(inner);
+            };
+            for (const folder in stackGroups) {
+                if (!folder.startsWith(prefix)) continue;
+                const branchKey = folder.slice(prefix.length).split('/')[0];
+                if (branchKey) collect(folder, branchKey);
+            }
+            // Fallback: hovered path is itself a leaf stackGroup
+            if (Object.keys(branchesOuter).length === 0 && stackGroups[path]) {
+                collect(path, '__self__');
+            }
+            const groups = [];
+            for (const branchKey in branchesOuter) {
+                const outerMerged = [], innerMerged = [];
+                for (const cs of branchesOuter[branchKey]) for (const p of cs) outerMerged.push(p);
+                for (const cs of branchesInner[branchKey]) for (const p of cs) innerMerged.push(p);
+                groups.push({
+                    folder: branchKey === '__self__' ? path : prefix + branchKey,
+                    corners: outerMerged,
+                    cornersInner: innerMerged
+                });
+            }
+            return { groups, branchesInner };
+        }
+
+        function setHoverBox(path) {
+            if (hoverBoxState.activePath === path) return;
+            hoverBoxState.activePath = path;
+            const labelColor = pathColor(path);
+            hoverBoxState.color = labelColor;
+            const { groups, branchesInner } = computeHoverGroups(path);
+            hoverBoxState.groups = groups;
+            syncPolyPool(hoverBoxG, groups.length, null);
+            syncPolyPool(hoverHullG, groups.length, 'hover-hull');
+            for (let i = 0; i < hoverHullG.childElementCount; i++) {
+                hoverHullG.children[i].style.stroke = labelColor;
+            }
+            hoverDim.style.display = groups.length > 0 ? '' : 'none';
+            rebuildBoxHelpers(branchesInner, labelColor);
+        }
+
+        // Dispose all hover-related rendered state. Does NOT touch hoverBoxState.activePath/.groups
+        // since those are reset by callers.
+        function disposeHoverRender() {
+            while (hoverBoxG.firstChild) hoverBoxG.removeChild(hoverBoxG.firstChild);
+            while (hoverHullG.firstChild) hoverHullG.removeChild(hoverHullG.firstChild);
+            while (hoverBoxHelperGroup.children.length > 0) {
+                const h = hoverBoxHelperGroup.children[0];
+                hoverBoxHelperGroup.remove(h);
+                // Do NOT dispose h.geometry (shared _unitCubeEdgesGeo)
+                if (h.material) h.material.dispose();
+            }
+            hoverDim.style.display = 'none';
+        }
+
+        function clearHoverBox() {
+            // If a label is selected, snap back to its bbox instead of clearing.
+            if (selectedLabelPath && hoverBoxState.activePath !== selectedLabelPath) {
+                setHoverBox(selectedLabelPath);
+                return;
+            }
+            if (selectedLabelPath) return; // already showing selected
+            hoverBoxState.activePath = null;
+            hoverBoxState.groups = [];
+            disposeHoverRender();
+        }
+
+        function bindHover(el, path) {
+            el.addEventListener('mouseenter', () => setHoverBox(path));
+            el.addEventListener('mouseleave', () => clearHoverBox());
         }
 
         function createLabel(name, path, worldPos, isGroup, navParentPath, rootGroupPath) {
             const el = document.createElement('span');
             el.className = 'stack-label' + (isGroup ? '' : ' nav-child-label');
             el.dataset.folderName = path;
-            const isHighlight = path === highlightPath;
-            const colorStyle = isHighlight ? 'color:#44f;' : '';
-            if (isHighlight) el.style.borderColor = '#44f';
-            el.innerHTML = `<span style="padding:2px 4px;cursor:pointer;${colorStyle}" data-path="${path}">${name}</span>`;
+            const labelColor = pathColor(path);
+            el.style.backgroundColor = labelColor;
+            el.style.borderColor = labelColor;
+            el.innerHTML = `<span style="padding:${LABEL_PADDING};cursor:pointer;" data-path="${path}">${name}</span>`;
             el.addEventListener('wheel', (e) => { e.stopPropagation(); renderer.domElement.dispatchEvent(new WheelEvent('wheel', e)); }, { passive: false });
             labelContainer.appendChild(el);
 
             const entry = { element: el, position: worldPos, xPos: worldPos.x, zPos: worldPos.z, folderName: path, isGroup, isAncestor: false, navParentPath, navVisible: false };
             stackLabels.push(entry);
 
-            el.addEventListener('mouseenter', () => {
-                if (currentFocusedParent || mouseIsDown) return;
-                treeDrivenNav = false;
-                activeGroupPath = rootGroupPath;
-                setNavVisible(path);
-                applyDimming(path);
-                highlightTreePath(path);
-            });
-            el.addEventListener('mouseleave', () => {
-                if (currentFocusedParent) return;
-                if (activeGroupPath === rootGroupPath) return;
-                resetNav();
-            });
-
             el.querySelector('span[data-path]').onclick = (e) => {
                 e.stopPropagation();
-                const clickedNode = findNodeByPath(dataTree, path);
-                if (clickedNode && clickedNode.path === node.path) renderContent(clickedNode);
-                else if (clickedNode) renderContent(clickedNode);
+                handleLabelClick(path, rootGroupPath);
             };
+            bindHover(el.querySelector('span[data-path]'), path);
 
             return entry;
         }
@@ -1844,29 +2233,71 @@ const updateCount = () => {
                 const aEl = document.createElement('span');
                 aEl.className = 'stack-label nav-ancestor-label';
                 aEl.dataset.folderName = aPath;
-                const aColor = aPath === highlightPath ? '#44f' : '#888';
-                aEl.style.borderColor = aColor;
-                aEl.innerHTML = `<span style="padding:2px 4px;cursor:pointer;color:${aColor}" data-path="${aPath}">${aName}</span>`;
+                const labelColor = pathColor(aPath);
+                aEl.style.backgroundColor = labelColor;
+                aEl.style.borderColor = labelColor;
+                aEl.innerHTML = `<span style="padding:${LABEL_PADDING};cursor:pointer;" data-path="${aPath}">${aName}</span>`;
                 aEl.addEventListener('wheel', (e) => { e.stopPropagation(); renderer.domElement.dispatchEvent(new WheelEvent('wheel', e)); }, { passive: false });
                 labelContainer.appendChild(aEl);
-                aEl.addEventListener('mouseenter', () => {
-                    highlightTreePath(aPath);
-                });
-                aEl.addEventListener('mouseleave', () => {
-                    if (currentFocusedParent) return;
-                    clearTreeHighlight();
-                });
                 aEl.querySelector('span[data-path]').onclick = (e) => {
                     e.stopPropagation();
-                    const clickedNode = findNodeByPath(dataTree, aPath);
-                    if (clickedNode) renderContent(clickedNode);
+                    handleLabelClick(aPath, groupPath);
                 };
+                bindHover(aEl.querySelector('span[data-path]'), aPath);
                 const ancestorOffset = (ancestors.length - ai) * 28;
                 stackLabels.push({ element: aEl, position: worldPos, xPos: gData.xPos, zPos: gData.zPos, folderName: aPath, isGroup: false, isAncestor: true, ancestorOffset, anchorGroup: groupPath, navParentPath: null, navVisible: false });
             }
 
             const posTree = buildPositionTree(gData.folders, groupPath);
             createChildLabels(posTree, groupPath, groupPath);
+        }
+
+        // Build annotation labels for the current scene root only
+        const annotations = window.folderAnnotations || {};
+        const sceneAnns = annotations[scenePath];
+        const ANN_ALLOWED_TAGS = new Set(['SPAN','DIV','A','IFRAME','PRE','BR','B','I','EM','STRONG','CODE']);
+        const ANN_ALLOWED_ATTRS = new Set(['class','href','src','target','rel']);
+        const ANN_ALLOWED_CLASSES = new Set(['thread','left','right','user_a','user_b','short','wide','ghost']);
+        function _annSanitize(root) {
+            const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
+            const bad = [];
+            let n;
+            while ((n = walker.nextNode())) {
+                if (!ANN_ALLOWED_TAGS.has(n.tagName)) { bad.push(n); continue; }
+                for (const a of Array.from(n.attributes)) {
+                    const k = a.name.toLowerCase();
+                    if (k.startsWith('on') || k === 'style' || !ANN_ALLOWED_ATTRS.has(k)) { n.removeAttribute(a.name); continue; }
+                    if ((k === 'href' || k === 'src') && a.value.trim().toLowerCase().startsWith('javascript:')) { n.removeAttribute(a.name); continue; }
+                    if (k === 'class') {
+                        const kept = a.value.split(/\s+/).filter(c => ANN_ALLOWED_CLASSES.has(c));
+                        if (kept.length) n.setAttribute('class', kept.join(' ')); else n.removeAttribute('class');
+                    }
+                }
+            }
+            for (const n of bad) n.remove();
+        }
+        if (Array.isArray(sceneAnns)) {
+            for (const ann of sceneAnns) {
+                if (!ann || typeof ann.html !== 'string') continue;
+                try {
+                    const el = document.createElement('div');
+                    el.className = 'annotation-label';
+                    el.style.position = 'absolute';
+                    el.style.willChange = 'transform';
+                    el.style.display = 'none';
+                    const tmp = document.createElement('template');
+                    tmp.innerHTML = ann.html;
+                    _annSanitize(tmp.content);
+                    el.appendChild(tmp.content);
+                    labelContainer.appendChild(el);
+                    annotationLabels.push({
+                        element: el,
+                        xPos: (Number(ann.x) || 0) / 2,
+                        yPos: (Number(ann.y) || 0) / 2,
+                        zPos: (Number(ann.z) || 0) / 2,
+                    });
+                } catch (e) { console.warn('annotation skipped', e); }
+            }
         }
     })();
 
@@ -1909,6 +2340,9 @@ const updateCount = () => {
         camera.right = frustumSize * newAspect / 2;
         camera.updateProjectionMatrix();
         renderer.setSize(container.clientWidth, container.clientHeight);
+        for (const h of hoverBoxHelperGroup.children) {
+            if (h.material && h.material.resolution) h.material.resolution.set(container.clientWidth, container.clientHeight);
+        }
     };
 
     new ResizeObserver(() => resizeHandler()).observe(container);
@@ -2060,8 +2494,58 @@ const updateCount = () => {
                 }
             }
 
+            // 3b. Annotations (display-only, no overlap logic, no MAX limit)
+            for (let i = 0; i < annotationLabels.length; i++) {
+                const ann = annotationLabels[i];
+                const rX = ann.xPos * cosR + ann.zPos * sinR;
+                const rZ = -ann.xPos * sinR + ann.zPos * cosR;
+                const vec = _labelVec.set(rX, ann.yPos, rZ);
+                vec.project(camera);
+                if (vec.z < 1 && vec.x >= -1.2 && vec.x <= 1.2 && vec.y >= -1.2 && vec.y <= 1.2) {
+                    const screenX = (vec.x * 0.5 + 0.5) * cWidth;
+                    const screenY = (-(vec.y * 0.5) + 0.5) * cHeight;
+                    if (ann.element.style.display !== 'block') ann.element.style.display = 'block';
+                    ann.element.style.transform = `translate3d(${screenX.toFixed(1)}px, ${screenY.toFixed(1)}px, 0)`;
+                } else {
+                    if (ann.element.style.display !== 'none') ann.element.style.display = 'none';
+                }
+            }
+
+            // 3c. Hover bbox (convex hull per branch)
+            if (hoverBoxState.groups.length > 0) {
+                const polys = hoverBoxG.children;
+                const hulls = hoverHullG.children;
+                for (let g = 0; g < hoverBoxState.groups.length; g++) {
+                    const corners = hoverBoxState.groups[g].corners;
+                    const pts2d = [];
+                    for (let c = 0; c < corners.length; c++) {
+                        const p = corners[c];
+                        const rX = p.x * cosR + p.z * sinR;
+                        const rZ = -p.x * sinR + p.z * cosR;
+                        const vec = _labelVec.set(rX, p.y, rZ);
+                        vec.project(camera);
+                        if (vec.z >= 1) continue;
+                        pts2d.push([(vec.x * 0.5 + 0.5) * cWidth, (-(vec.y * 0.5) + 0.5) * cHeight]);
+                    }
+                    const poly = polys[g];
+                    const hull2 = hulls[g];
+                    if (pts2d.length < 3) {
+                        if (poly.style.display !== 'none') poly.style.display = 'none';
+                        if (hull2.style.display !== 'none') hull2.style.display = 'none';
+                        continue;
+                    }
+                    const hull = convexHull2D(pts2d);
+                    let pointsStr = '';
+                    for (const h of hull) pointsStr += h[0].toFixed(1) + ',' + h[1].toFixed(1) + ' ';
+                    poly.setAttribute('points', pointsStr);
+                    hull2.setAttribute('points', pointsStr);
+                    if (poly.style.display === 'none') poly.style.display = '';
+                    if (hull2.style.display === 'none') hull2.style.display = '';
+                }
+            }
+
             // 4. Wire system
-            const WIRE = { r: 12, pad: 20, biasMin: 80, biasRange: 120, arrowSize: 6, arrowMinLen: 400 };
+            const WIRE = { rSrc: WIRE_CURVE_RADIUS_SOURCE, rTgt: WIRE_CURVE_RADIUS_TARGET, pad: 20, biasMin: 80, biasRange: 120, arrowSize: 6, arrowMinLen: 400 };
 
             function roundCorner(d, a, c, b, maxR) {
                 const d1x = c.x-a.x, d1y = c.y-a.y, d2x = b.x-c.x, d2y = b.y-c.y;
@@ -2072,13 +2556,13 @@ const updateCount = () => {
             }
 
             function routeWire(a, b, dir) {
-                const { r: R, pad: P, biasMin: bm, biasRange: br } = WIRE;
+                const { rSrc, rTgt, pad: P, biasMin: bm, biasRange: br } = WIRE;
                 const flip = dir === -1;
                 const ra = flip ? { x: -a.x, y: a.y } : a;
                 const rb = flip ? { x: -b.x, y: b.y } : b;
                 let wp;
                 if (rb.x > ra.x + P) {
-                    const mx = (ra.x + rb.x) / 2;
+                    const mx = ra.x + (rb.x - ra.x) * WIRE_CORNER_POSITION;
                     wp = [{ x: mx, y: ra.y }, { x: mx, y: rb.y }];
                 } else {
                     const bias = 0.5 + Math.min(Math.max((Math.abs(rb.y - ra.y) - bm) / br, 0), 1) * 0.35;
@@ -2088,7 +2572,15 @@ const updateCount = () => {
                 const pts = [ra, ...wp, rb];
                 if (flip) pts.forEach(p => p.x = -p.x);
                 let d = '';
-                for (let i = 1; i < pts.length - 1; i++) d = roundCorner(d, pts[i-1], pts[i], pts[i+1], R);
+                const nCorners = pts.length - 2;
+                const rMid = (rSrc + rTgt) / 2;
+                for (let i = 1; i < pts.length - 1; i++) {
+                    let r;
+                    if (i === 1) r = rSrc;
+                    else if (i === pts.length - 2) r = rTgt;
+                    else r = rMid;
+                    d = roundCorner(d, pts[i-1], pts[i], pts[i+1], r);
+                }
                 return { d: d + ` L ${pts[pts.length-1].x} ${pts[pts.length-1].y}`, pts };
             }
 
@@ -2104,15 +2596,28 @@ const updateCount = () => {
             function labelR(el) { return { x: (el._screenX||0) + (el.offsetWidth||60), y: (el._screenY||0) + (el.offsetHeight||18)/2 }; }
             function labelL(el) { return { x: el._screenX||0, y: (el._screenY||0) + (el.offsetHeight||18)/2 }; }
 
+            // Build wire path strings between consecutive elements, returning d-strings and arrow point sets.
             function chainWires(els, out, inp, dir) {
-                let d = '';
-                const arrows = [];
+                const paths = [], arrows = [];
                 for (let i = 0; i < els.length - 1; i++) {
                     const w = wireD(out(els[i]), inp(els[i+1]), dir);
-                    d += w.d;
+                    paths.push(w.d);
                     arrows.push(w.pts);
                 }
-                return { d, arrows };
+                return { paths, arrows };
+            }
+
+            // Resize an SVG <g> to hold exactly N <path> elements and set each path's d attribute.
+            function renderWireGroup(group, paths) {
+                while (group.childElementCount < paths.length) {
+                    group.appendChild(document.createElementNS('http://www.w3.org/2000/svg', 'path'));
+                }
+                while (group.childElementCount > paths.length) {
+                    group.removeChild(group.lastChild);
+                }
+                for (let i = 0; i < paths.length; i++) {
+                    group.children[i].setAttribute('d', paths[i]);
+                }
             }
 
             // Arrow: midpoint of path, chevron pointing in travel direction
@@ -2120,22 +2625,21 @@ const updateCount = () => {
             function queueArrow(pts, dim) {
                 let total = 0;
                 const lens = [];
-                for (let i = 0; i < pts.length - 1; i++) { const l = Math.hypot(pts[i+1].x-pts[i].x, pts[i+1].y-pts[i].y); lens.push(l); total += l; }
-                if (total < WIRE.arrowMinLen) return;
-                let target = total / 2, acc = 0;
-                for (let i = 0; i < lens.length; i++) {
-                    if (acc + lens[i] >= target) {
-                        const t = (target - acc) / lens[i];
-                        _arrows.push({
-                            x: pts[i].x + (pts[i+1].x-pts[i].x)*t,
-                            y: pts[i].y + (pts[i+1].y-pts[i].y)*t,
-                            a: Math.atan2(pts[i+1].y-pts[i].y, pts[i+1].x-pts[i].x) * 180 / Math.PI,
-                            dim
-                        });
-                        return;
-                    }
-                    acc += lens[i];
+                let longestIdx = 0, longestLen = 0;
+                for (let i = 0; i < pts.length - 1; i++) {
+                    const l = Math.hypot(pts[i+1].x-pts[i].x, pts[i+1].y-pts[i].y);
+                    lens.push(l);
+                    total += l;
+                    if (l > longestLen + 0.5) { longestLen = l; longestIdx = i; }
                 }
+                if (total < WIRE.arrowMinLen) return;
+                const i = longestIdx;
+                _arrows.push({
+                    x: pts[i].x + (pts[i+1].x-pts[i].x)*0.5,
+                    y: pts[i].y + (pts[i+1].y-pts[i].y)*0.5,
+                    a: Math.atan2(pts[i+1].y-pts[i].y, pts[i+1].x-pts[i].x) * 180 / Math.PI,
+                    dim
+                });
             }
             function flushArrows() {
                 wireArrowG.innerHTML = '';
@@ -2188,38 +2692,40 @@ const updateCount = () => {
                 const labelIn = flowRight ? labelL : labelR;
 
                 const ancW = chainWires(anc, labelOut, labelIn, wireDir);
-                wirePathAncestor.setAttribute('d', ancW.d);
+                renderWireGroup(wirePathAncestor, ancW.paths);
                 ancW.arrows.forEach(pts => queueArrow(pts, false));
 
                 const mainW = chainWires(main, labelOut, labelIn, wireDir);
-                let mainD = mainW.d;
+                renderWireGroup(wirePath, mainW.paths);
                 mainW.arrows.forEach(pts => queueArrow(pts, false));
-                const isLeaf = activeLabelPath && !stackLabels.some(sl => !sl.isGroup && !sl.isAncestor && sl.navParentPath === activeLabelPath);
-                if (!sceneData.isTreeDriven() && !isLeaf && main.length) {
-                    const mw = wireD(labelOut(main[main.length - 1]), { x: mouseX, y: mouseY }, wireDir);
-                    mainD += mw.d;
-                    queueArrow(mw.pts, false);
-                }
-                wirePath.setAttribute('d', mainD);
 
                 const onPath = new Set([...(gEl ? [gEl.dataset.folderName] : []), ...childEls.map(el => el.dataset.folderName)]);
-                let dimD = '';
-                for (const cel of main) {
-                    const cp = cel.dataset.folderName;
-                    for (const sl of stackLabels) {
-                        if (sl.isGroup || sl.isAncestor || !sl.navVisible || sl.navParentPath !== cp || sl.element.style.display !== 'block' || onPath.has(sl.folderName)) continue;
-                        const w = wireD(labelOut(cel), labelIn(sl.element), wireDir);
-                        dimD += w.d;
-                        queueArrow(w.pts, true);
+                const dimPaths = [];
+                // For each visible nav label not on the path, draw a wire from its nearest path ancestor
+                for (const sl of stackLabels) {
+                    if (sl.isGroup || sl.isAncestor || !sl.navVisible) continue;
+                    if (sl.element.style.display !== 'block') continue;
+                    if (onPath.has(sl.folderName)) continue;
+                    // Find nearest ancestor in main
+                    let nearest = null;
+                    for (const cel of main) {
+                        const cp = cel.dataset.folderName;
+                        if (sl.folderName === cp || sl.folderName.startsWith(cp + '/')) {
+                            if (!nearest || cp.length > nearest.dataset.folderName.length) nearest = cel;
+                        }
                     }
+                    if (!nearest) continue;
+                    const w = wireD(labelOut(nearest), labelIn(sl.element), wireDir);
+                    dimPaths.push(w.d);
+                    queueArrow(w.pts, true);
                 }
-                wirePathDim.setAttribute('d', dimD);
+                renderWireGroup(wirePathDim, dimPaths);
                 flushArrows();
                 wireSvg.style.display = '';
             } else {
-                wirePath.setAttribute('d', '');
-                wirePathAncestor.setAttribute('d', '');
-                wirePathDim.setAttribute('d', '');
+                renderWireGroup(wirePath, []);
+                renderWireGroup(wirePathAncestor, []);
+                renderWireGroup(wirePathDim, []);
                 wireArrowG.innerHTML = '';
                 wireSvg.style.display = 'none';
             }

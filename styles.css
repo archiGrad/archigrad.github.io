@@ -12,12 +12,64 @@
     --font-dots-md: 14px;
     --font-loading-grid: 14px;
     --text-content-fontsize: 14px;
+    --accent: rgb(0, 0, 255);                              /* tree active item, breadcrumb active, 3d label highlight, 3d slice hover outline, mobile div-nav-fwd */
+    --accent-b: #222;                            /* tree hover bg, stack-label hover bg, search match bg, scrollbar thumb */
+    --accent-c: rgb(21, 255, 0);                 /* mobile div-nav-back */
+    --accent-border: #222;                       /* content-div borders (desktop), page-separator (desktop) */
+    --accent-b-border: rgba(255,255,255, 0.1);   /* floating menu (#tree) border */
+    --accent-border-mobile: #111;                /* all mobile borders (tree, content-div, page-separator) */
+    --text: white;                               /* body text, tree links, tree search input, breadcrumb non-active, tree highlighted items */
+    --text-dim: #444;                            /* dimmed tree items (unrelated to current node) */
+    --text-muted: #555;                          /* nav arrows, strikethrough tree items, page-label, search placeholder */
+    --link: white;                               /* <a> tags */
+    --bg: black;                                 /* body bg, #tree bg, 3d scene clear color, .div-label (breadcrumb) bg */
+
+    /* 3D stack labels */
+    --label-bg: black;                           /* .stack-label background */
+    --label-text: white;                         /* .stack-label text color */
+    --label-border-color: white;                 /* .stack-label border color */
+    --label-border-width: 1px;                   /* .stack-label border thickness */
+    --label-border-radius: 13px;                 /* .stack-label corner roundness */
+    --label-line-height: 1.6;                    /* .stack-label line height */
+    --label-deco-color: #666;                    /* .nav-deco - dots between path parts */
+    --label-deco-font-size: 9px;                 /* .nav-deco font-size */
+    --label-count-color: white;                  /* .nav-count - (N) count badge */
+    --label-ancestor-opacity: 0.7;               /* .nav-ancestor-label - parent labels above group */
+    --label-padding: 2px 4px;                    /* inner padding on label text spans */
+    --label-shadow: none;                        /* text-shadow / box-shadow on labels (e.g. 0 0 4px black) */
+    --label-hover-bg: var(--accent-b);           /* hover bg on label spans */
+
+    /* 3D nav wires (SVG) */
+    --wire-color: white;                         /* main wire + arrow heads */
+    --wire-dim-color: rgba(255,255,255,0.3);     /* dim wires (sibling/child) + their arrows */
+    --wire-width: 2px;                           /* all wires + arrows */
+    --wire-ancestor-color: #666;                 /* .nav-wire-path-ancestor */
+    --wire-ancestor-dash: 2 2;                   /* stroke-dasharray for ancestor wires */
+    --wire-curve-radius-source: 200px;            /* corner radius near the source label */
+    --wire-curve-radius-target: 30px;            /* corner radius near the target label */
+    --wire-corner-position: 0.8;                  /* horizontal corner position from source to target (0.3 = bend closer to source) */
+    --label-dim-opacity: 0.6;                    /* opacity of unrelated labels when something is selected */
+
+    /* Hover bbox */
+    --hover-hull-width: 1px;                     /* hull outline thickness */
+    --hover-hull-margin: 0.15;                   /* world-space offset between geometry and outline (units, not px) */
+    --hover-3dbox-width: 1;                      /* 3D box line thickness (unitless, Three.js LineMaterial) */
+    --hover-mask-display: block;                 /* set to 'none' to disable dim overlay */
+    --hover-hull-display: block;                 /* set to 'none' to disable hull outline */
+    --hover-hull-opacity: 1;                     /* hull stroke opacity */
+
+    /* Mobile overrides */
+    --hover-hull-margin-mobile: 0.05;
+    --hover-mask-opacity-mobile: 0.8;
+    --hover-3dbox-width-mobile: 0.0001;
+    --hover-hull-width-mobile: 1px;
+    --hover-hull-opacity-mobile: 0.1;
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 body { 
-    background: black; 
-    color: white; 
+    background: var(--bg); 
+    color: var(--text); 
     font-family: var(--font-family-main);
     font-size: var(--font-ui, 11px);
     display: flex;
@@ -38,8 +90,8 @@ body {
     z-index: 1000;
     border-radius: 0px;
     cursor: grab;
-    background: rgba(0,0,0);
-    border: 1px solid rgba(255,255,255, 0.1);
+    background: var(--bg);
+    border: 1px solid var(--accent-b-border);
 }
 
 #tree-content {
@@ -48,7 +100,7 @@ body {
 }
 #nav-back, #nav-fwd, #tree-expand-all {
     cursor: pointer;
-    color: #555;
+    color: var(--text-muted);
     font-family: var(--font-family-main);
     font-weight: 900;
     font-size: calc(var(--font-ui) + 2px);
@@ -56,7 +108,7 @@ body {
     padding: 0 3px;
 }
 #nav-back { margin-left: auto; }
-#nav-back:hover, #nav-fwd:hover, #tree-expand-all:hover { color: white !important; }
+#nav-back:hover, #nav-fwd:hover, #tree-expand-all:hover { color: var(--text) !important; }
 #tree-legend {
     padding-top: 10px;
     padding-bottom: 4px;
@@ -72,11 +124,14 @@ body {
     width: 60%;
     padding: 4px 6px;
     background: rgba(0,0,0,0);
-    color: white;
+    color: var(--text);
     border: none;
     font-family: var(--font-family-main);
     font-size: var(--font-ui, 11px);
     outline: none;
+}
+#tree-search::placeholder {
+    color: var(--text-muted);
 }
 
 #content { 
@@ -86,12 +141,12 @@ body {
     overflow: hidden;
 }
 .tree-item { white-space: pre; }
-.tree-link { cursor: pointer; color: white; user-select: none; }
-.tree-caret:hover, .tree-name:hover, .tree-link.tree-hover { background: #222; }
+.tree-link { cursor: pointer; color: var(--text); user-select: none; }
+.tree-caret:hover, .tree-name:hover, .tree-link.tree-hover { background: var(--accent-b); }
 .tree-caret { font-weight: 900; font-size: calc(var(--font-ui) + 2px); margin-right: 4px; }
 .content-div {
-    border-left: 1px solid #222;
-    border-bottom: 1px solid #222;
+    border-left: 1px solid var(--accent-border);
+    border-bottom: 1px solid var(--accent-border);
     box-sizing: border-box;
     position: relative;
     overflow: hidden;
@@ -100,7 +155,7 @@ body {
     position: absolute;
     top: 5px;
     left: 5px;
-    background: black;
+    background: var(--bg);
     padding: 2px 5px;
     z-index: 100;
 }
@@ -173,36 +228,42 @@ body {
 }
 .stack-label {
     display: none;
-    border: 1px solid white;
+    border: var(--label-border-width) solid var(--label-border-color);
     position: absolute;
     top: 0;
     left: 0;
     will-change: transform;
     pointer-events: none;
     cursor: pointer;
-    color: white;
+    color: var(--label-text);
     font-family: var(--font-family-main);
     font-size: var(--font-ui, 11px);
     user-select: none;
-    background: black;
-    border-radius: 15px;
-    line-height: 1.6;
+    background: var(--label-bg);
+    border-radius: var(--label-border-radius);
+    line-height: var(--label-line-height);
     white-space: nowrap;
+    text-shadow: var(--label-shadow);
 }
 .stack-label span { pointer-events: auto; }
-.stack-label > span[data-path]:hover { background: #222; border-radius: inherit; }
-.stack-label .nav-deco { color: #666; font-size: var(--font-dots-md, 9px); }
-.stack-label .nav-count { color: white; margin-left: 2px; }
-.nav-ancestor-label { opacity: 0.7; }
+.stack-label > span[data-path]:hover { background: var(--label-hover-bg); border-radius: inherit; }
+.stack-label:has(> span[data-path]:hover) { background: var(--label-hover-bg) !important; border-color: var(--label-hover-bg) !important; }
+.stack-label.label-selected { background: white !important; color: black !important; border-color: white !important; }
+.stack-label.label-selected > span[data-path] { color: black !important; background: white !important; border-radius: inherit; }
+.stack-label .nav-deco { color: var(--label-deco-color); font-size: var(--label-deco-font-size); }
+.stack-label .nav-count { color: var(--label-count-color); margin-left: 2px; }
+.nav-ancestor-label { opacity: var(--label-ancestor-opacity); }
 
 .nav-wire-svg { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9; shape-rendering: crispEdges; }
 
-.nav-wire-svg path { fill: none; stroke: white; stroke-width: 1; }
-.nav-wire-svg .nav-wire-path { stroke-width: 1; }
-.nav-wire-svg .nav-wire-path-ancestor { stroke:#666; stroke-width: 1;  stroke-dasharray: 2 2;   }
-.nav-wire-svg .nav-wire-path-dim { stroke: rgba(255,255,255,0.2); }
-.wire-arrow line { stroke: white; stroke-width: 1; stroke-linecap: round; stroke-linejoin: round; }
-.wire-arrow-dim line { stroke: rgba(255,255,255,0.3); stroke-width: 1; }
+.nav-wire-svg path { fill: none; stroke: var(--wire-color); stroke-width: var(--wire-width); }
+.nav-wire-svg .nav-wire-path-group path { stroke-width: var(--wire-width); }
+.nav-wire-svg .nav-wire-path-ancestor-group path { stroke: var(--wire-ancestor-color); stroke-width: var(--wire-width); stroke-dasharray: var(--wire-ancestor-dash); }
+.nav-wire-svg .nav-wire-path-dim-group path { stroke: var(--wire-dim-color); stroke-width: var(--wire-width); }
+.nav-wire-svg .hover-bbox-dim { fill: black; fill-opacity: var(--hover-mask-opacity, 0.4); pointer-events: none; display: var(--hover-mask-display); }
+.nav-wire-svg .hover-hull { fill: none; stroke-width: var(--hover-hull-width); stroke-opacity: var(--hover-hull-opacity, 1); pointer-events: none; display: var(--hover-hull-display); }
+.wire-arrow line { stroke: var(--wire-color); stroke-width: var(--wire-width); stroke-linecap: round; stroke-linejoin: round; }
+.wire-arrow-dim line { stroke: var(--wire-dim-color); stroke-width: var(--wire-width); }
 .dot-sm { font-size: var(--font-dots-sm, 7px); }
 .dot-md { font-size: var(--font-dots-md, 9px); }
 canvas { display: block; width: 100%; height: 100%; }
@@ -286,7 +347,7 @@ canvas { display: block; width: 100%; height: 100%; }
 
 .ss-highlight {
     position: absolute;
-    border: 2px solid blue;
+    border: 2px solid var(--accent);
     pointer-events: none;
     display: none;
     z-index: 2;
@@ -343,12 +404,12 @@ canvas { display: block; width: 100%; height: 100%; }
     left: 5px;
     font-family: var(--font-family-main);
     font-size: var(--font-page-index, 10px);
-    color: #666;
+    color: var(--text-muted);
 }
 
 .page-separator {
     border: none;
-    border-top: 1px solid #333;
+    border-top: 1px solid var(--accent-border);
     margin: 0;
     padding: 0;
 }
@@ -509,7 +570,7 @@ canvas { display: block; width: 100%; height: 100%; }
 }
 
 a {
-    color: rgb(255, 255, 255);
+    color: var(--link);
 }
 
 .title_large {
@@ -567,14 +628,22 @@ a {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #222;
+  background: var(--accent-b);
 }
 * {
   scrollbar-width: thin;
-  scrollbar-color: #333 transparent;
+  scrollbar-color: var(--accent-b) transparent;
 }
 
 @media (max-width: 768px) {
+
+    :root {
+        --hover-hull-margin: var(--hover-hull-margin-mobile);
+        --hover-mask-opacity: var(--hover-mask-opacity-mobile);
+        --hover-3dbox-width: var(--hover-3dbox-width-mobile);
+        --hover-hull-width: var(--hover-hull-width-mobile);
+        --hover-hull-opacity: var(--hover-hull-opacity-mobile);
+    }
 
 
 
@@ -606,7 +675,7 @@ a {
     }
     #tree {
         border: none;
-        border-bottom: 1px solid #111;
+        border-bottom: 1px solid var(--accent-border-mobile);
         position: relative !important;
         top: unset !important;
         left: unset !important;
@@ -628,16 +697,13 @@ a {
         overflow: hidden;
     }
     .content-div {
-        border-left: 1px solid #111;
-        border-bottom: 1px solid #111;
+        border-left: 1px solid var(--accent-border-mobile);
+        border-bottom: 1px solid var(--accent-border-mobile);
         min-height: 0 !important;
         flex-direction: column !important;
     }
     .div-label {
         display: none;
-    }
-    #label-toggle {
-        display: none !important;
     }
     #tree-legend {
         display: none !important;
@@ -650,25 +716,16 @@ a {
         font-size: 35px;
     }
     .div-nav-back {
-        color: rgb(21, 255, 0);
+        color: var(--accent-c);
     }
     .div-nav-fwd {
-        color: #44f;
+        color: var(--accent);
     }
     body {
         touch-action: manipulation;
     }
     .stack-label {
         pointer-events: auto;
-    }
-    .nav-wire-svg {
-        display: none !important;
-    }
-    .nav-child-label {
-        display: none !important;
-    }
-    .nav-ancestor-label {
-        display: none !important;
     }
     .content-div canvas {
         touch-action: none;
@@ -677,7 +734,7 @@ a {
         width: 90%;
     }
     .page-separator {
-        border-top: 1px solid #111;
+        border-top: 1px solid var(--accent-border-mobile);
     }
     /* .text_center_fullscreen {
         font-size: 14px;
@@ -689,27 +746,3 @@ a {
     background: white;
     color: black;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
