@@ -1,0 +1,73 @@
+.annotation-label {
+    pointer-events: none;
+    user-select: none;
+    z-index: 1;
+    color: #ffffff65;
+}
+
+.annotation-label * { pointer-events: none; color: inherit; }
+.annotation-label a { pointer-events: auto; text-decoration: underline; }
+.annotation-label iframe,
+.annotation-label pre { pointer-events: auto; }
+
+.annotation-label .thread {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    width: 100%;
+}
+
+.user_a, .user_b {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 4px;
+    padding: 6px 10px;
+    border-radius: 12px;
+    word-wrap: break-word;
+}
+
+.annotation-label .text-black { color: black; }
+.annotation-label .text-white { color: white; }
+.annotation-label .text-grey  { color: #99999965; }
+
+
+.user_a { background: black; }
+.user_b { background: white; }
+
+.left  { flex-direction: row; }
+.right { flex-direction: row-reverse; }
+
+.short { max-width: 200px; }
+.wide  { max-width: 500px; }
+
+.ghost { background: transparent; padding: 0; }
+
+.annotation-label .marker { color: #ffffff; }
+
+.annotation-label iframe {
+    display: block;
+    border: 0;
+    border-radius: 6px;
+    margin-top: 4px;
+}
+.annotation-label iframe.short { width: 240px; height: 140px; }
+.annotation-label iframe.wide  { width: 500px; height: 300px; }
+
+.annotation-label pre {
+    margin: 4px 0;
+    padding: 4px;
+    overflow: auto;
+    font-size: 11px;
+    background: rgba(255,255,255,0.1);
+}
+
+.annotation-label .dot {
+    display: inline-block;
+    width: 2px;
+    height: 2px;
+    background: white;
+}
+.annotation-label .dot.red   { background: #ff0400; }
+.annotation-label .dot.green { background: #09ff00; }
+.annotation-label .dot.blue  { background: #1100ff; }
+.annotation-label .dot.white { background: #ffffff; }
