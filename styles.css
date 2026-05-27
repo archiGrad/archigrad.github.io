@@ -12,9 +12,12 @@
     --font-dots-md: 14px;
     --font-loading-grid: 14px;
     --text-content-fontsize: 14px;
-    --accent: rgb(0, 0, 255);                              /* tree active item, breadcrumb active, 3d label highlight, 3d slice hover outline, mobile div-nav-fwd */
+    --accent: rgb(0, 0, 255);                              /* tree active item, breadcrumb active, 3d label highlight, 3d slice hover outline*/
     --accent-b: #222;                            /* tree hover bg, stack-label hover bg, search match bg, scrollbar thumb */
-    --accent-c: rgb(21, 255, 0);                 /* mobile div-nav-back */
+    --accent-c: rgb(255, 255, 255);                 /* mobile div-nav-back */
+    --accent-d: rgb(255, 255, 255);                  /* mobile div-nav-fwd */
+
+
     --accent-border: #222;                       /* content-div borders (desktop), page-separator (desktop) */
     --accent-b-border: rgba(255,255,255, 0.1);   /* floating menu (#tree) border */
     --accent-border-mobile: #111;                /* all mobile borders (tree, content-div, page-separator) */
@@ -719,7 +722,7 @@ a {
         color: var(--accent-c);
     }
     .div-nav-fwd {
-        color: var(--accent);
+        color: var(--accent-d);
     }
     body {
         touch-action: manipulation;

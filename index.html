@@ -349,9 +349,13 @@ function seededColorFromPath(path) {
 // Color system: depth-driven palette per top-level content branch.
 // Public API: computePathColors(root), pathColor(path).
 // ============================================================
+// const _PALETTE = [
+//     [0, 0, 255],    [255, 0, 0],    [0, 255, 0],    [255, 255, 0],
+//     [255, 128, 0],  [255, 0, 255],  [0, 255, 255],  [128, 0, 255]
+// ];
 const _PALETTE = [
-    [0, 0, 255],    [255, 0, 0],    [0, 255, 0],    [255, 255, 0],
-    [255, 128, 0],  [255, 0, 255],  [0, 255, 255],  [128, 0, 255]
+    [0, 0, 0],    [0, 0, 0],    [0, 0, 0],    [0, 0, 0],
+    [0, 0, 0],  [0, 0, 0],  [0, 0, 0],  [0, 0, 0],  [0, 0, 0],  [0, 0, 0]
 ];
 const _pathColors = {};
 
@@ -1183,7 +1187,7 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
     return { el, update, dispose };
 }
 
-async function createThreeScene(container, images, node, highlightPath) {
+async function createThreeScene(container, images, node, highlightPath, hostNavAnns) {
     const scene = new THREE.Scene();
     const grouped = {};
     const stackGroups = {};
@@ -2254,10 +2258,13 @@ const updateCount = () => {
 
         // Build annotation labels for the current scene root only
         const annotations = window.folderAnnotations || {};
-        const sceneAnns = annotations[scenePath];
+        const sceneAnns = [
+            ...(annotations[scenePath] || []),
+            ...(hostNavAnns && scenePath !== highlightPath ? (annotations[highlightPath] || []) : []),
+        ];
         const ANN_ALLOWED_TAGS = new Set(['SPAN','DIV','A','IFRAME','PRE','BR','B','I','EM','STRONG','CODE']);
         const ANN_ALLOWED_ATTRS = new Set(['class','href','src','target','rel']);
-        const ANN_ALLOWED_CLASSES = new Set(['thread','left','right','user_a','user_b','short','wide','ghost']);
+        const ANN_ALLOWED_CLASSES = new Set(['thread','left','right','user_a','user_b','short','wide','ghost','dot','red','green','blue', 'white','marker','text','text-black', 'text-white', 'text-grey']);
         function _annSanitize(root) {
             const walker = document.createTreeWalker(root, NodeFilter.SHOW_ELEMENT);
             const bad = [];
@@ -3054,8 +3061,9 @@ scriptTags.forEach(oldScript => {
 
     await new Promise(resolve => requestAnimationFrame(resolve));
     const sceneDivs = Array.from(contentDiv.children).filter(d => d._sceneContainer);
-    for (const div of sceneDivs) {
-        scenePromises.push(createThreeScene(div._sceneContainer, div._sceneChild.ai, div._sceneChild, currentNode.path));
+    for (let i = 0; i < sceneDivs.length; i++) {
+        const div = sceneDivs[i];
+        scenePromises.push(createThreeScene(div._sceneContainer, div._sceneChild.ai, div._sceneChild, currentNode.path, i === 0));
     }
     await Promise.all(scenePromises);
     return Promise.resolve();
