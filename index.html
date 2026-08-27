@@ -30,6 +30,10 @@
         <label class="debug-row">
             <input type="checkbox" id="debug-stats"> stats
         </label>
+        <label class="debug-row">
+            <input type="checkbox" id="debug-image-info"> image info
+        </label>
+        <div id="image-info-panel" style="display:none;font-family:monospace;font-size:10px;line-height:1.5;margin-top:4px;padding:4px;border:1px solid #333;word-break:break-all;"></div>
     </div>
 </div>
 <div id="content"></div>
@@ -86,13 +90,17 @@ THREE.ColorManagement.enabled = false;
     tree.style.left = Math.floor(Math.random() * Math.max(0, innerWidth - 300)) + 'px';
     tree.style.top = Math.floor(Math.random() * Math.max(0, innerHeight - 400)) + 'px';
 
-    tree.addEventListener('mousedown', (e) => {
+    tree.style.touchAction = 'none';
+    treeContent.style.touchAction = 'pan-y';
+    tree.addEventListener('pointerdown', (e) => {
+        if (window.innerWidth <= 768) return;
         if (e.target.closest('.tree-link, #tree-search, #nav-back, #nav-fwd, #tree-expand-all')) return;
         dragging = true; ox = e.clientX - tree.offsetLeft; oy = e.clientY - tree.offsetTop;
+        tree.setPointerCapture(e.pointerId);
         tree.style.cursor = 'grabbing'; document.body.style.userSelect = 'none';
     });
-    document.addEventListener('mousemove', (e) => { if (dragging) { tree.style.left = (e.clientX - ox) + 'px'; tree.style.top = (e.clientY - oy) + 'px'; } });
-    document.addEventListener('mouseup', () => { if (dragging) { dragging = false; tree.style.cursor = 'grab'; document.body.style.userSelect = ''; } });
+    tree.addEventListener('pointermove', (e) => { if (dragging) { tree.style.left = (e.clientX - ox) + 'px'; tree.style.top = (e.clientY - oy) + 'px'; } });
+    tree.addEventListener('pointerup', () => { if (dragging) { dragging = false; tree.style.cursor = 'grab'; document.body.style.userSelect = ''; } });
 
     function clearSearch() {
         visibleMatches.forEach(l => l.style.background = '');
@@ -189,6 +197,28 @@ THREE.ColorManagement.enabled = false;
         const show = statsCheckbox.checked;
         localStorage.setItem('debug_show_stats', show ? '1' : '0');
         (window._statsInstances || []).forEach(dom => { dom.style.display = show ? '' : 'none'; });
+    });
+    const iiCheckbox = document.getElementById('debug-image-info');
+    const iiPanel = document.getElementById('image-info-panel');
+    iiCheckbox.checked = localStorage.getItem('debug_show_image_info') === '1';
+    window._imageInfo = { hover: null, pinned: null };
+    const renderII = () => {
+        if (!iiCheckbox.checked) { iiPanel.style.display = 'none'; return; }
+        const d = window._imageInfo.hover || window._imageInfo.pinned;
+        if (!d) { iiPanel.style.display = 'none'; iiPanel.innerHTML = ''; return; }
+        const parts = (d.path || '?').split('/');
+        const fname = parts.pop();
+        let html = '<div style="color:#fff;">' + fname + (d.pinned ? ' <span style="color:#4f4;">[pinned]</span>' : '') + '</div>';
+        if (parts.length) html += '<div style="color:#666;">' + parts.join('/') + '</div>';
+        if (d.anim) html += '<div style="color:#4af;">gif frame ' + d.frame + '/' + d.frames + (d.shared ? ' <span style="color:#fa0;">(dedup slot)</span>' : '') + ' &middot; ' + d.gd + 'ms</div>';
+        html += '<div style="color:#666;">sheet ' + d.sheet + ' &middot; slot ' + d.slot + ' &middot; ' + d.sz + 'px</div>';
+        iiPanel.innerHTML = html;
+        iiPanel.style.display = 'block';
+    };
+    window._reportImageInfo = (kind, data) => { window._imageInfo[kind] = data; renderII(); };
+    iiCheckbox.addEventListener('change', () => {
+        localStorage.setItem('debug_show_image_info', iiCheckbox.checked ? '1' : '0');
+        renderII();
     });
 })();
 
@@ -611,10 +641,11 @@ function createAnimInstancedMaterial(ssArray, frameMapTex, frameMapWidth) {
             attribute float spriteH;
             attribute float spritesPerRow;
             attribute float instanceOpacity;
+            attribute float phaseOffset;
             varying vec2 vUv;
             varying float vOpacity;
             void main() {
-                float frame = mod(floor(time / gifDuration), frameMapLength);
+                float frame = mod(floor((time + phaseOffset) / gifDuration), frameMapLength);
                 float texIdx = frameMapOffset + frame;
                 float tx = (mod(texIdx, frameMapWidth) + 0.5) / frameMapWidth;
                 float ty = (floor(texIdx / frameMapWidth) + 0.5) / 1.0;
@@ -677,7 +708,11 @@ fetch('data.json')
         const params = new URLSearchParams(window.location.search);
         const path = params.get('path');
 
-        const targetNode = path ? findNodeByPath(dataTree, path) : dataTree;
+        //const targetNode = path ? findNodeByPath(dataTree, path) : dataTree;
+            
+        const _folders = [];
+        (function walk(n){ if(n.children){ _folders.push(n); n.children.forEach(walk); } })(dataTree);
+        const targetNode = path ? findNodeByPath(dataTree, path) : (_folders[Math.floor(Math.random()*_folders.length)] || dataTree);
         
         await renderContent(targetNode || dataTree);
         
@@ -891,6 +926,148 @@ function disposeScene(sceneData) {
 }
 
 function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cropConfig) {
+    const pathIdx = {};
+    {
+        const perFolder = {};
+        for (const img of images) {
+            const p = img.path || '';
+            const fn = p.split('/').pop();
+            if (fn.startsWith('AA') || fn.startsWith('ZZ')) continue;
+            const folder = p.slice(0, p.length - fn.length);
+            if (!(folder in perFolder)) perFolder[folder] = 0;
+            pathIdx[p] = { folder, idx: perFolder[folder]++ };
+        }
+    }
+    const deltaEl = document.createElement('div');
+    deltaEl.style.cssText = 'position:absolute;display:none;pointer-events:none;font-family:monospace;font-size:10px;color:#fff;background:rgba(0,0,0,0.65);padding:1px 5px;z-index:60;';
+    container.appendChild(deltaEl);
+    let lastClient = null;
+    const _drawUvGrid2d = (g, w, h) => {
+        g.save();
+        g.lineWidth = Math.max(2, w / 200);
+        g.strokeStyle = 'rgba(255,255,255,0.22)';
+        for (let i = 1; i < 10; i++) {
+            const t = i / 10;
+            g.beginPath(); g.moveTo(t * w, 0); g.lineTo(t * w, h); g.stroke();
+            g.beginPath(); g.moveTo(0, t * h); g.lineTo(w, t * h); g.stroke();
+        }
+        g.font = Math.max(8, Math.round(w / 26)) + 'px monospace';
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        g.fillStyle = 'rgba(255,255,255,0.45)';
+        for (let cx = 0; cx < 10; cx++) for (let cy = 0; cy < 10; cy++) {
+            g.fillText(String.fromCharCode(65 + cx) + cy, (cx + 0.5) * w / 10, h - (cy + 0.5) * h / 10);
+        }
+        const lw = Math.max(4, w / 110);
+        const ah = lw * 2.8;
+        const arrow = (x0, y0, x1, y1, col) => {
+            g.strokeStyle = col; g.fillStyle = col; g.lineWidth = lw;
+            g.beginPath(); g.moveTo(x0, y0); g.lineTo(x1, y1); g.stroke();
+            const ang = Math.atan2(y1 - y0, x1 - x0);
+            g.beginPath();
+            g.moveTo(x1, y1);
+            g.lineTo(x1 - ah * Math.cos(ang - 0.45), y1 - ah * Math.sin(ang - 0.45));
+            g.lineTo(x1 - ah * Math.cos(ang + 0.45), y1 - ah * Math.sin(ang + 0.45));
+            g.closePath(); g.fill();
+        };
+        arrow(0, h - lw / 2, w - ah, h - lw / 2, '#f44');
+        arrow(lw / 2, h, lw / 2, ah, '#48f');
+        g.restore();
+    };
+    const _pinnedGridData = (p) => {
+        const TL = [p[0], p[1], p[2]], TR = [p[3], p[4], p[5]], BR = [p[6], p[7], p[8]], BL = [p[9], p[10], p[11]];
+        const lerp = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+        const grid = [];
+        for (let i = 1; i < 10; i++) {
+            const t = i / 10;
+            grid.push(...lerp(BL, BR, t), ...lerp(TL, TR, t));
+            grid.push(...lerp(BL, TL, t), ...lerp(BR, TR, t));
+        }
+        return { grid, BL, BR, TL };
+    };
+    const _mkAxisCone = (color) => {
+        const c = new THREE.Mesh(new THREE.ConeGeometry(1, 1, 10), new THREE.MeshBasicMaterial({ color, depthTest: false, transparent: true }));
+        c.renderOrder = 1001;
+        c.frustumCulled = false;
+        return c;
+    };
+    const _placeCone = (cone, from, to, quadSize) => {
+        const f = new THREE.Vector3(...from), t = new THREE.Vector3(...to);
+        const dir = t.clone().sub(f).normalize();
+        const len = quadSize * 0.07;
+        cone.scale.set(len * 0.4, len, len * 0.4);
+        cone.position.copy(t);
+        cone.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir);
+    };
+    const _refreshPinnedGrid = (p) => {
+        const d = _pinnedGridData(p);
+        const quadSize = new THREE.Vector3(...d.BR).distanceTo(new THREE.Vector3(...d.BL));
+        if (!pinnedGrid) {
+            pinnedGrid = new THREE.Group();
+            pinnedGrid.renderOrder = 1000;
+            const gGeo = new LineSegmentsGeometry();
+            gGeo.setPositions(d.grid);
+            const gMat = new LineMaterial({ color: 0x999999, linewidth: 2, transparent: true, opacity: 0.8, depthTest: false });
+            gMat.resolution.set(container.clientWidth, container.clientHeight);
+            const gl = new LineSegments2(gGeo, gMat);
+            gl.renderOrder = 1000;
+            gl.frustumCulled = false;
+            pinnedGrid._gridLines = gl;
+            pinnedGrid.add(gl);
+            const mkAxis = (color) => {
+                const geo = new LineGeometry();
+                geo.setPositions([0, 0, 0, 1, 1, 1]);
+                const mat = new LineMaterial({ color, linewidth: 5, depthTest: false, transparent: true });
+                mat.color.convertSRGBToLinear();
+                mat.resolution.set(container.clientWidth, container.clientHeight);
+                const l = new Line2(geo, mat);
+                l.renderOrder = 1001;
+                l.frustumCulled = false;
+                return l;
+            };
+            pinnedGrid._uAxis = mkAxis(0xff3333);
+            pinnedGrid._vAxis = mkAxis(0x4488ff);
+            pinnedGrid._uCone = _mkAxisCone(0xff3333);
+            pinnedGrid._vCone = _mkAxisCone(0x4488ff);
+            pinnedGrid.add(pinnedGrid._uAxis, pinnedGrid._vAxis, pinnedGrid._uCone, pinnedGrid._vCone);
+            scene.add(pinnedGrid);
+        } else {
+            pinnedGrid._gridLines.geometry.dispose();
+            const gGeo = new LineSegmentsGeometry();
+            gGeo.setPositions(d.grid);
+            pinnedGrid._gridLines.geometry = gGeo;
+        }
+        pinnedGrid._gridLines.material.resolution.set(container.clientWidth, container.clientHeight);
+        pinnedGrid._uAxis.geometry.setPositions([...d.BL, ...d.BR]);
+        pinnedGrid._uAxis.computeLineDistances();
+        pinnedGrid._uAxis.material.resolution.set(container.clientWidth, container.clientHeight);
+        pinnedGrid._vAxis.geometry.setPositions([...d.BL, ...d.TL]);
+        pinnedGrid._vAxis.computeLineDistances();
+        pinnedGrid._vAxis.material.resolution.set(container.clientWidth, container.clientHeight);
+        _placeCone(pinnedGrid._uCone, d.BL, d.BR, quadSize);
+        _placeCone(pinnedGrid._vCone, d.BL, d.TL, quadSize);
+    };
+    const updateDeltaLabel = () => {
+        const cb = document.getElementById('debug-image-info');
+        let txt = null;
+        if (cb && cb.checked && pinnedInfo && currentInfo && lastClient
+            && pinnedInfo.path && currentInfo.path && pinnedInfo.path !== currentInfo.path) {
+            const a = pathIdx[pinnedInfo.path];
+            const b = pathIdx[currentInfo.path];
+            if (a && b && a.folder === b.folder) {
+                const diff = b.idx - a.idx;
+                txt = (diff > 0 ? '+' : '') + diff + ' slices';
+            }
+        }
+        if (txt == null) {
+            deltaEl.style.display = 'none';
+            return;
+        }
+        const cr = container.getBoundingClientRect();
+        deltaEl.textContent = txt;
+        deltaEl.style.left = (lastClient.x - cr.left + 14) + 'px';
+        deltaEl.style.top = (lastClient.y - cr.top + 14) + 'px';
+        deltaEl.style.display = 'block';
+    };
     const cropEnabled = cropConfig && cropConfig.enabled;
     const cropOpacity = cropConfig ? cropConfig.opacity : 1.0;
     const slotMap = [];
@@ -961,8 +1138,13 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
     let wireframe = null;
     let currentSlot = null;
     let currentAnim = null;
+    let currentInfo = null;
     let pinnedSlot = null;
     let pinnedAnim = null;
+    let pinnedInfo = null;
+    let pinnedWireframe = null;
+    let pinnedGrid = null;
+    let lastPts = null;
     let mouseDownPos = null;
     let preview = null;
 
@@ -970,6 +1152,10 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
         preview = document.createElement('div');
         preview.className = 'ss-crop-preview';
         if (cropOpacity < 1) preview.style.opacity = cropOpacity;
+        const uvc = document.createElement('canvas');
+        uvc.style.cssText = 'position:absolute;left:0;top:0;width:100%;height:100%;pointer-events:none;';
+        preview.appendChild(uvc);
+        preview._uvCanvas = uvc;
         el.appendChild(preview);
     }
 
@@ -1009,25 +1195,83 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
         preview.style.backgroundSize = (SS * sc) + 'px ' + (SS * sc) + 'px';
         preview.style.backgroundPosition = (-slot.px * sc) + 'px ' + (-slot.py * sc) + 'px';
         preview.style.display = 'block';
+        if (preview._uvCanvas) {
+            const iiCb3 = document.getElementById('debug-image-info');
+            const uvc = preview._uvCanvas;
+            if (iiCb3 && iiCb3.checked) {
+                const sw = preview.offsetWidth || 256;
+                const sh = preview.offsetHeight || 256;
+                uvc.width = sw;
+                uvc.height = sh;
+                uvc.style.display = '';
+                _drawUvGrid2d(uvc.getContext('2d'), sw, sh);
+            } else {
+                uvc.style.display = 'none';
+            }
+        }
+    };
+
+    const placeHighlight = (slot) => {
+        const imgEl = wrap.querySelector('img[data-ss-key="' + slot.key + '"]');
+        if (!imgEl) { highlight.style.display = 'none'; return; }
+        const ir = imgEl.getBoundingClientRect();
+        const wr = wrap.getBoundingClientRect();
+        const sc = ir.width / SS;
+        highlight.style.display = 'block';
+        highlight.style.left = (ir.left - wr.left + slot.px * sc) + 'px';
+        highlight.style.top = (ir.top - wr.top + slot.py * sc) + 'px';
+        highlight.style.width = (slot.pw * sc) + 'px';
+        highlight.style.height = (slot.ph * sc) + 'px';
     };
 
     const hidePreview = () => {
-        if (!preview) return;
-        preview.style.display = 'none';
-        preview.style.backgroundImage = '';
+        if (preview) {
+            preview.style.display = 'none';
+            preview.style.backgroundImage = '';
+        }
         pinnedSlot = null;
         pinnedAnim = null;
+        pinnedInfo = null;
+        if (pinnedWireframe) pinnedWireframe.visible = false;
+        if (pinnedGrid) pinnedGrid.visible = false;
+        deltaEl.style.display = 'none';
+        if (!currentSlot) highlight.style.display = 'none';
+        if (window._reportImageInfo) window._reportImageInfo('pinned', null);
     };
 
     let lastHitId = null;
     const onDown = (e) => { mouseDownPos = { x: e.clientX, y: e.clientY }; };
     const onClick = (e) => {
-        if (!cropEnabled) return;
         if (mouseDownPos && (Math.abs(e.clientX - mouseDownPos.x) > 4 || Math.abs(e.clientY - mouseDownPos.y) > 4)) return;
         if (!currentSlot) { hidePreview(); return; }
         if (lastHitId && pinnedSlot && lastHitId === pinnedSlot._hitId) { hidePreview(); return; }
         pinnedSlot = { ...currentSlot, _hitId: lastHitId };
         pinnedAnim = currentAnim ? { ...currentAnim } : null;
+        pinnedInfo = currentInfo ? { ...currentInfo, pinned: true } : null;
+        if (window._reportImageInfo) window._reportImageInfo('pinned', pinnedInfo);
+        if (lastPts) {
+            if (!pinnedWireframe) {
+                const pGeo = new LineGeometry();
+                pGeo.setPositions(lastPts);
+                const pMat = new LineMaterial({ color: ACCENT, linewidth: 2 });
+                pMat.color.convertSRGBToLinear();
+                pMat.resolution.set(container.clientWidth, container.clientHeight);
+                pinnedWireframe = new Line2(pGeo, pMat);
+                pinnedWireframe.renderOrder = 999;
+                pinnedWireframe.frustumCulled = false;
+                pinnedWireframe.computeLineDistances();
+                scene.add(pinnedWireframe);
+            } else {
+                pinnedWireframe.geometry.setPositions(lastPts);
+                pinnedWireframe.computeLineDistances();
+                pinnedWireframe.material.resolution.set(container.clientWidth, container.clientHeight);
+            }
+            pinnedWireframe.visible = true;
+            _refreshPinnedGrid(lastPts);
+            const iiCb = document.getElementById('debug-image-info');
+            pinnedGrid.visible = !!(iiCb && iiCb.checked);
+        }
+        if (!cropEnabled) return;
         const imgEl = wrap.querySelector('img[data-ss-key="' + currentSlot.key + '"]');
         positionPreview(currentSlot, imgEl);
     };
@@ -1038,13 +1282,17 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
         const r = renderer.domElement.getBoundingClientRect();
         mouse.x = ((e.clientX - r.left) / r.width) * 2 - 1;
         mouse.y = -((e.clientY - r.top) / r.height) * 2 + 1;
+        lastClient = { x: e.clientX, y: e.clientY };
         dirty = true;
     };
     const onLeave = () => {
         dirty = false;
-        highlight.style.display = 'none';
+        if (pinnedSlot) placeHighlight(pinnedSlot); else highlight.style.display = 'none';
         info.style.display = 'none';
         if (wireframe) wireframe.visible = false;
+        currentInfo = null;
+        if (window._reportImageInfo) window._reportImageInfo('hover', null);
+        deltaEl.style.display = 'none';
     };
     renderer.domElement.addEventListener('mousemove', onMove);
     renderer.domElement.addEventListener('mouseleave', onLeave);
@@ -1067,6 +1315,7 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
 
             let slot = null;
             currentAnim = null;
+            currentInfo = null;
             lastHitId = hitId(hit);
             if (isInstanced && hit.instanceId != null && hit.object._animInstances) {
                 const inst = hit.object._animInstances[hit.instanceId];
@@ -1074,10 +1323,11 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
                     const imgData = inst.imgData;
                     const sz = imgData.sz;
                     const spr = Math.floor(SS / sz);
-                    const frame = Math.floor(time / imgData.gd) % imgData.fm.length;
+                    const frame = Math.floor((time + (inst.phase || 0)) / imgData.gd) % imgData.fm.length;
                     const idx = imgData.fm[frame];
                     slot = { key, px: (idx % spr) * sz, py: Math.floor(idx / spr) * sz, pw: sz, ph: sz };
-                    currentAnim = { key, sz, spr, gd: imgData.gd, fm: imgData.fm };
+                    currentAnim = { key, sz, spr, gd: imgData.gd, fm: imgData.fm, phase: inst.phase || 0 };
+                    currentInfo = { path: imgData.path, anim: true, frame, frames: imgData.fm.length, gd: imgData.gd, shared: imgData.fm.indexOf(idx) !== frame, sheet: key ? key.split('/').pop() : '?', slot: idx, sz };
                     dirty = true;
                 }
             } else if (hit.uv) {
@@ -1086,26 +1336,22 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
                 for (const s of slotMap) {
                     if (s.key === key && px >= s.px && px < s.px + s.pw && py >= s.py && py < s.py + s.ph) { slot = s; break; }
                 }
+                const qi = Math.floor(hit.faceIndex / 2);
+                const srcImg = hit.object._imgDatas ? hit.object._imgDatas[qi] : null;
+                if (srcImg) currentInfo = { path: srcImg.path, anim: false, sheet: key ? key.split('/').pop() : '?', slot: srcImg.idx, sz: srcImg.sz };
+            }
+            if (window._reportImageInfo) window._reportImageInfo('hover', currentInfo);
+            updateDeltaLabel();
+            if (pinnedGrid) {
+                const iiCb2 = document.getElementById('debug-image-info');
+                pinnedGrid.visible = !!(pinnedInfo && iiCb2 && iiCb2.checked);
             }
             const imgEl = key ? wrap.querySelector('img[data-ss-key="' + key + '"]') : null;
             currentSlot = (slot && imgEl) ? { key: slot.key, px: slot.px, py: slot.py, pw: slot.pw, ph: slot.ph } : null;
             if (slot && imgEl) {
-                const ir = imgEl.getBoundingClientRect();
-                const wr = wrap.getBoundingClientRect();
-                const sc = ir.width / SS;
-                highlight.style.display = 'block';
-                highlight.style.left = (ir.left - wr.left + slot.px * sc) + 'px';
-                highlight.style.top = (ir.top - wr.top + slot.py * sc) + 'px';
-                highlight.style.width = (slot.pw * sc) + 'px';
-                highlight.style.height = (slot.ph * sc) + 'px';
-                const u0 = (slot.px / SS).toFixed(3);
-                const v0 = (slot.py / SS).toFixed(3);
-                const u1 = ((slot.px + slot.pw) / SS).toFixed(3);
-                const v1 = ((slot.py + slot.ph) / SS).toFixed(3);
-                info.textContent = key.split('/').pop() + '  uv [' + u0 + ',' + v0 + '] [' + u1 + ',' + v1 + ']  ' + slot.pw + 'x' + slot.ph;
-                info.style.display = 'block';
+                placeHighlight(slot);
             } else {
-                highlight.style.display = 'none';
+                if (pinnedSlot) placeHighlight(pinnedSlot); else highlight.style.display = 'none';
                 info.style.display = 'none';
             }
 
@@ -1149,25 +1395,42 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
                 wireframe.material.resolution.set(container.clientWidth, container.clientHeight);
             }
             wireframe.visible = true;
+            lastPts = pts;
         } else {
             currentSlot = null;
             currentAnim = null;
+            currentInfo = null;
             lastHitId = null;
-            highlight.style.display = 'none';
+            if (pinnedSlot) placeHighlight(pinnedSlot); else highlight.style.display = 'none';
             info.style.display = 'none';
             if (wireframe) wireframe.visible = false;
+            if (window._reportImageInfo) window._reportImageInfo('hover', null);
+            deltaEl.style.display = 'none';
         }
-        if (pinnedAnim && preview && preview.style.display !== 'none') {
+        if (pinnedAnim && ((preview && preview.style.display !== 'none') || pinnedInfo)) {
             const a = pinnedAnim;
-            const frame = Math.floor(time / a.gd) % a.fm.length;
+            const frame = Math.floor((time + (a.phase || 0)) / a.gd) % a.fm.length;
             const idx = a.fm[frame];
-            const px = (idx % a.spr) * a.sz;
-            const py = Math.floor(idx / a.spr) * a.sz;
-            const imgEl = wrap.querySelector('img[data-ss-key="' + a.key + '"]');
-            if (imgEl) {
-                const displaySz = preview.offsetWidth;
-                const sc = displaySz / a.sz;
-                preview.style.backgroundPosition = (-px * sc) + 'px ' + (-py * sc) + 'px';
+            if (pinnedInfo && pinnedInfo.anim && pinnedInfo.frame !== frame) {
+                pinnedInfo.frame = frame;
+                pinnedInfo.slot = idx;
+                pinnedInfo.shared = a.fm.indexOf(idx) !== frame;
+                if (window._reportImageInfo) window._reportImageInfo('pinned', pinnedInfo);
+            }
+            if (pinnedSlot) {
+                pinnedSlot.px = (idx % a.spr) * a.sz;
+                pinnedSlot.py = Math.floor(idx / a.spr) * a.sz;
+                if (!currentSlot) placeHighlight(pinnedSlot);
+            }
+            if (preview && preview.style.display !== 'none') {
+                const px = (idx % a.spr) * a.sz;
+                const py = Math.floor(idx / a.spr) * a.sz;
+                const imgEl = wrap.querySelector('img[data-ss-key="' + a.key + '"]');
+                if (imgEl) {
+                    const displaySz = preview.offsetWidth;
+                    const sc = displaySz / a.sz;
+                    preview.style.backgroundPosition = (-px * sc) + 'px ' + (-py * sc) + 'px';
+                }
             }
             dirty = true;
         }
@@ -1178,8 +1441,15 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
         renderer.domElement.removeEventListener('mouseleave', onLeave);
         renderer.domElement.removeEventListener('mousedown', onDown);
         renderer.domElement.removeEventListener('click', onClick);
+        if (window._reportImageInfo) { window._reportImageInfo('hover', null); window._reportImageInfo('pinned', null); }
+        deltaEl.remove();
         ro.disconnect();
         if (wireframe) { wireframe.geometry.dispose(); wireframe.material.dispose(); }
+        if (pinnedWireframe) { pinnedWireframe.geometry.dispose(); pinnedWireframe.material.dispose(); }
+        if (pinnedGrid) {
+            pinnedGrid.traverse(o => { if (o.geometry) o.geometry.dispose(); if (o.material) o.material.dispose(); });
+            scene.remove(pinnedGrid);
+        }
         if (el.parentNode) el.parentNode.removeChild(el);
         if (preview && preview.parentNode) preview.parentNode.removeChild(preview);
     }
@@ -1589,6 +1859,7 @@ async function createThreeScene(container, images, node, highlightPath, hostNavA
     toggleBtn.id = 'label-toggle';
     toggleBtn.textContent = 'hide labels';
     toggleBtn.style.cssText = 'position:absolute;bottom:5px;left:5px;color:#444;font-family:monospace;font-size:11px;cursor:pointer;z-index:100;user-select:none;';
+    if (window.innerWidth <= 768) toggleBtn.style.display = 'none';
     let labelsVisible = true;
     toggleBtn.onclick = () => {
         labelsVisible = !labelsVisible;
@@ -1736,7 +2007,7 @@ const updateCount = () => {
                     });
                 } else {
                     const bKey = ssBase(imgData.ss);
-                    if (!mergeBuckets[bKey]) mergeBuckets[bKey] = { geoms: [], ssArray: imgData.ss };
+                    if (!mergeBuckets[bKey]) mergeBuckets[bKey] = { geoms: [], ssArray: imgData.ss, imgs: [] };
                     
                     const geometry = baseGeometry.clone();
                     geometry.applyMatrix4(matrix);
@@ -1756,6 +2027,7 @@ const updateCount = () => {
                     uvs.setXY(3, u_end, v_start);
                     
                     mergeBuckets[bKey].geoms.push(geometry);
+                    mergeBuckets[bKey].imgs.push(imgData);
                 }
                 loadedImages++;
                 progress.imgs++;
@@ -1766,6 +2038,7 @@ const updateCount = () => {
                     const mergedGeo = mergeGeometries(bucket.geoms);
                     const mat = getStackMaterial(bucket.ssArray, folderName);
                     const mesh = new THREE.Mesh(mergedGeo, mat);
+                    mesh._imgDatas = bucket.imgs;
                     stackGroup.add(mesh);
                     bucket.geoms.forEach(g => g.dispose());
                 }
@@ -1813,9 +2086,12 @@ const updateCount = () => {
             const heights = new Float32Array(count);
             const sprs = new Float32Array(count);
             const opacities = new Float32Array(count);
+            const phases = new Float32Array(count);
 
             for (let i = 0; i < count; i++) {
                 const inst = bucket.instances[i];
+                phases[i] = (Math.random() * 2 - 1) * (inst.imgData.pj ?? 200);
+                inst.phase = phases[i];
                 offsets[i] = allFrames.length;
                 lengths[i] = inst.imgData.fm.length;
                 durations[i] = inst.imgData.gd;
@@ -1847,6 +2123,7 @@ const updateCount = () => {
             geo.setAttribute('spriteW', new THREE.InstancedBufferAttribute(widths, 1));
             geo.setAttribute('spriteH', new THREE.InstancedBufferAttribute(heights, 1));
             geo.setAttribute('spritesPerRow', new THREE.InstancedBufferAttribute(sprs, 1));
+            geo.setAttribute('phaseOffset', new THREE.InstancedBufferAttribute(phases, 1));
             const opAttr = new THREE.InstancedBufferAttribute(opacities, 1);
             opAttr.setUsage(THREE.DynamicDrawUsage);
             geo.setAttribute('instanceOpacity', opAttr);

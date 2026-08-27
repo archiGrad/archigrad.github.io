@@ -71,3 +71,4 @@
 .annotation-label .dot.green { background: #09ff00; }
 .annotation-label .dot.blue  { background: #1100ff; }
 .annotation-label .dot.white { background: #ffffff; }
+.annotation-label a.blue { color: #1100ff; }
