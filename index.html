@@ -94,7 +94,7 @@ THREE.ColorManagement.enabled = false;
     treeContent.style.touchAction = 'pan-y';
     tree.addEventListener('pointerdown', (e) => {
         if (window.innerWidth <= 768) return;
-        if (e.target.closest('.tree-link, #tree-search, #nav-back, #nav-fwd, #tree-expand-all')) return;
+        if (e.target.closest('.tree-link, #tree-search, #nav-back, #nav-fwd, #tree-expand-all, #debug-section')) return;
         dragging = true; ox = e.clientX - tree.offsetLeft; oy = e.clientY - tree.offsetTop;
         tree.setPointerCapture(e.pointerId);
         tree.style.cursor = 'grabbing'; document.body.style.userSelect = 'none';
@@ -263,7 +263,7 @@ function makeGrid(percent) {
     for (let r = 0; r < GRID_ROWS; r++) {
         let row = '';
         for (let c = 0; c < GRID_COLS; c++) {
-            row += active.has(r * GRID_COLS + c) ? '·' : ' ';
+            row += active.has(r * GRID_COLS + c) ? '\u00B7' : '\u00A0';
         }
         rows += row + '\n';
     }
@@ -320,6 +320,8 @@ async function updateLoaderAsync() {
 let dataTree;
 let spriteConfig;
 let activeScenes = [];
+let rotClock = () => Date.now();
+let onSlicePin = null;
 let currentPage = 0;
 let allFilteredChildren = [];
 function getPageSize() { return window.innerWidth <= 768 ? 6 : 16; }
@@ -538,7 +540,7 @@ function breadcrumbHtml(path, activePath) {
         const pNode = findNodeByPath(dataTree, partPath);
         const acc = spriteConfig.show_nav_accessories;
         const deco = acc ? navDeco(pNode, 'dot-md', spriteConfig.breadcrumb_html_dots) : '';
-        return `<span style="color:${color};cursor:pointer" data-path="${partPath}">${part}${deco}</span>`;
+        return `<span style="color:${color};cursor:pointer" data-rec="crumb" data-path="${partPath}">${part}${deco}</span>`;
     }).join(` <span style="color:${TEXT}">&gt;</span> `);
 }
 
@@ -769,6 +771,7 @@ function buildTree(node, container, depth = 0, isLast = true, prefix = '') {
     item.innerHTML = prefix + connector;
     const link = document.createElement('span');
     link.className = 'tree-link';
+    link.dataset.rec = 'tree-link';
     
     const hasChildren = node.children && node.children.length > 0;
     const deco = navDeco(node, 'dot-sm');
@@ -776,6 +779,7 @@ function buildTree(node, container, depth = 0, isLast = true, prefix = '') {
     if (hasChildren) {
         const caret = document.createElement('span');
         caret.className = 'tree-caret';
+        caret.dataset.rec = 'tree-caret';
         caret.textContent = '>';
         caret.onclick = (e) => {
             e.stopPropagation();
@@ -788,6 +792,7 @@ function buildTree(node, container, depth = 0, isLast = true, prefix = '') {
 
     const nameSpan = document.createElement('span');
     nameSpan.className = 'tree-name';
+    nameSpan.dataset.rec = 'tree-name';
     nameSpan.innerHTML = node.name + deco;
     link.appendChild(nameSpan);
     link.dataset.path = node.path;
@@ -903,6 +908,8 @@ function clearTreeHighlight() {
 
 function disposeScene(sceneData) {
     if (sceneData.animationId) cancelAnimationFrame(sceneData.animationId);
+    if (sceneData.abort) sceneData.abort.abort();
+    if (sceneData.controls) sceneData.controls.dispose();
     if (sceneData.resizeHandler) window.removeEventListener('resize', sceneData.resizeHandler);
     if (sceneData.labelContainer && sceneData.labelContainer.parentNode) {
         sceneData.labelContainer.parentNode.removeChild(sceneData.labelContainer);
@@ -1240,11 +1247,16 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
     };
 
     let lastHitId = null;
+    let lastTime = 0;
     const onDown = (e) => { mouseDownPos = { x: e.clientX, y: e.clientY }; };
     const onClick = (e) => {
         if (mouseDownPos && (Math.abs(e.clientX - mouseDownPos.x) > 4 || Math.abs(e.clientY - mouseDownPos.y) > 4)) return;
-        if (!currentSlot) { hidePreview(); return; }
-        if (lastHitId && pinnedSlot && lastHitId === pinnedSlot._hitId) { hidePreview(); return; }
+        const before = pinnedSlot ? pinnedSlot._hitId : null;
+        if (!currentSlot || (lastHitId && pinnedSlot && lastHitId === pinnedSlot._hitId)) hidePreview();
+        else pinCurrent();
+        if (onSlicePin && (pinnedSlot ? pinnedSlot._hitId : null) !== before) onSlicePin(container, pinnedInfo ? pinnedInfo.path : null);
+    };
+    const pinCurrent = () => {
         pinnedSlot = { ...currentSlot, _hitId: lastHitId };
         pinnedAnim = currentAnim ? { ...currentAnim } : null;
         pinnedInfo = currentInfo ? { ...currentInfo, pinned: true } : null;
@@ -1275,6 +1287,51 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
         const imgEl = wrap.querySelector('img[data-ss-key="' + currentSlot.key + '"]');
         positionPreview(currentSlot, imgEl);
     };
+    const pin = (path) => {
+        if (path == null) { hidePreview(); return true; }
+        if (!meshCache) {
+            meshCache = [];
+            scene.traverse(obj => { if (obj.isMesh || obj.isInstancedMesh) meshCache.push(obj); });
+        }
+        const order = [0, 1, 3, 2];
+        for (const obj of meshCache) {
+            const key = obj.material._ssArray ? obj.material._ssArray[0].replace('_lod0.ktx2', '') : null;
+            const sheet = key ? key.split('/').pop() : '?';
+            const pos = obj.geometry.attributes.position;
+            const pts = [];
+            let i;
+            if (obj._animInstances && (i = obj._animInstances.findIndex(a => a.imgData.path === path)) >= 0) {
+                const inst = obj._animInstances[i], img = inst.imgData, sz = img.sz, spr = Math.floor(SS / sz);
+                const frame = Math.floor((lastTime + (inst.phase || 0)) / img.gd) % img.fm.length;
+                const idx = img.fm[frame];
+                const _v = new THREE.Vector3();
+                obj.getMatrixAt(i, _tmpMat4);
+                for (const o of order) {
+                    _v.set(pos.getX(o), pos.getY(o), pos.getZ(o)).applyMatrix4(_tmpMat4);
+                    pts.push(_v.x, _v.y, _v.z);
+                }
+                currentSlot = { key, px: (idx % spr) * sz, py: Math.floor(idx / spr) * sz, pw: sz, ph: sz };
+                currentAnim = { key, sz, spr, gd: img.gd, fm: img.fm, phase: inst.phase || 0 };
+                currentInfo = { path: img.path, anim: true, frame, frames: img.fm.length, gd: img.gd, shared: img.fm.indexOf(idx) !== frame, sheet, slot: idx, sz };
+                lastHitId = 'i:' + obj.uuid + ':' + i;
+            } else if (obj._imgDatas && (i = obj._imgDatas.findIndex(d => d.path === path)) >= 0) {
+                const img = obj._imgDatas[i], sz = img.sz, spr = Math.floor(SS / sz);
+                for (const o of order) pts.push(pos.getX(i * 4 + o), pos.getY(i * 4 + o), pos.getZ(i * 4 + o));
+                currentSlot = { key, px: (img.idx % spr) * sz, py: Math.floor(img.idx / spr) * sz, pw: sz, ph: sz };
+                currentAnim = null;
+                currentInfo = { path: img.path, anim: false, sheet, slot: img.idx, sz };
+                lastHitId = 'f:' + obj.uuid + ':' + i;
+            } else continue;
+            pts.push(pts[0], pts[1], pts[2]);
+            lastPts = pts;
+            pinCurrent();
+            currentSlot = currentAnim = currentInfo = lastHitId = null;
+            placeHighlight(pinnedSlot);
+            if (pinnedAnim) dirty = true;
+            return true;
+        }
+        return false;
+    };
     renderer.domElement.addEventListener('mousedown', onDown);
     renderer.domElement.addEventListener('click', onClick);
 
@@ -1298,6 +1355,7 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
     renderer.domElement.addEventListener('mouseleave', onLeave);
 
     function update(camera, time) {
+        lastTime = time;
         if (!dirty) return;
         dirty = false;
         if (!meshCache) {
@@ -1454,11 +1512,16 @@ function createSpritesheetBg(container, images, SS, scene, renderer, opacity, cr
         if (preview && preview.parentNode) preview.parentNode.removeChild(preview);
     }
 
-    return { el, update, dispose };
+    return { el, update, dispose, pin };
 }
 
 async function createThreeScene(container, images, node, highlightPath, hostNavAnns) {
     const scene = new THREE.Scene();
+    const ac = new AbortController();
+    const ownTex = new Map();
+    const mine = (t) => { if (!t) return t; let c = ownTex.get(t); if (!c) ownTex.set(t, c = t.clone()); return c; };
+    const sceneMaterial = (ss, f) => { const m = getStackMaterial(ss, f); if (!m._own) { m.map = mine(m.map); m._own = true; } return m; };
+    ac.signal.addEventListener('abort', () => { for (const c of ownTex.values()) c.dispose(); ownTex.clear(); });
     const grouped = {};
     const stackGroups = {};
     const animInstances = [];
@@ -1851,12 +1914,13 @@ async function createThreeScene(container, images, node, highlightPath, hostNavA
     const hoverBoxHelperGroup = new THREE.Group();
     scene.add(hoverBoxHelperGroup);
     let mouseIsDown = false;
-    document.addEventListener('pointerdown', (e) => { if (e.button === 0 || e.button === 1) mouseIsDown = true; });
-    document.addEventListener('pointerup', (e) => { if (e.button === 0 || e.button === 1) mouseIsDown = false; });
+    document.addEventListener('pointerdown', (e) => { if (e.button === 0 || e.button === 1) mouseIsDown = true; }, { signal: ac.signal });
+    document.addEventListener('pointerup', (e) => { if (e.button === 0 || e.button === 1) mouseIsDown = false; }, { signal: ac.signal });
 
  
     const toggleBtn = document.createElement('span');
     toggleBtn.id = 'label-toggle';
+    toggleBtn.dataset.rec = 'label-toggle';
     toggleBtn.textContent = 'hide labels';
     toggleBtn.style.cssText = 'position:absolute;bottom:5px;left:5px;color:#444;font-family:monospace;font-size:11px;cursor:pointer;z-index:100;user-select:none;';
     if (window.innerWidth <= 768) toggleBtn.style.display = 'none';
@@ -1965,7 +2029,7 @@ const updateCount = () => {
 
             for (let i = 0; i < stackImages.length; i++) {
                 const imgData = stackImages[i];
-                stackMaterials.add(getStackMaterial(imgData.ss, folderName));
+                stackMaterials.add(sceneMaterial(imgData.ss, folderName));
                 
                 const aspect = imgData.w / imgData.h;
                 const width  = aspect >= 1 ? aspect : 1;
@@ -2036,7 +2100,7 @@ const updateCount = () => {
             for (const [bKey, bucket] of Object.entries(mergeBuckets)) {
                 if (bucket.geoms.length > 0) {
                     const mergedGeo = mergeGeometries(bucket.geoms);
-                    const mat = getStackMaterial(bucket.ssArray, folderName);
+                    const mat = sceneMaterial(bucket.ssArray, folderName);
                     const mesh = new THREE.Mesh(mergedGeo, mat);
                     mesh._imgDatas = bucket.imgs;
                     stackGroup.add(mesh);
@@ -2111,6 +2175,7 @@ const updateCount = () => {
             frameMapTex.needsUpdate = true;
 
             const mat = createAnimInstancedMaterial(bucket.ssArray, frameMapTex, fmWidth);
+            mat.uniforms.map.value = mine(mat.uniforms.map.value);
             const geo = baseGeometry.clone();
             const iMesh = new THREE.InstancedMesh(geo, mat, count);
             for (let i = 0; i < count; i++) iMesh.setMatrixAt(i, bucket.instances[i].matrix);
@@ -2249,6 +2314,7 @@ const updateCount = () => {
         }
 
         sceneData.isTreeDriven = () => treeDrivenNav;
+        sceneData.resetAll = resetAll;
 
         sceneData.driveWireNav = function(targetPath) {
             if (currentFocusedParent || mouseIsDown) return;
@@ -2280,7 +2346,7 @@ const updateCount = () => {
             clearHoverBox();
         };
 
-        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') resetAll(); });
+        document.addEventListener('keydown', (e) => { if (e.key === 'Escape') resetAll(); }, { signal: ac.signal });
 
         let _ptrDown = null;
         container.addEventListener('pointerdown', (e) => { _ptrDown = { x: e.clientX, y: e.clientY }; });
@@ -2473,7 +2539,7 @@ const updateCount = () => {
             const labelColor = pathColor(path);
             el.style.backgroundColor = labelColor;
             el.style.borderColor = labelColor;
-            el.innerHTML = `<span style="padding:${LABEL_PADDING};cursor:pointer;" data-path="${path}">${name}</span>`;
+            el.innerHTML = `<span style="padding:${LABEL_PADDING};cursor:pointer;" data-rec="label" data-path="${path}">${name}</span>`;
             el.addEventListener('wheel', (e) => { e.stopPropagation(); renderer.domElement.dispatchEvent(new WheelEvent('wheel', e)); }, { passive: false });
             labelContainer.appendChild(el);
 
@@ -2517,7 +2583,7 @@ const updateCount = () => {
                 const labelColor = pathColor(aPath);
                 aEl.style.backgroundColor = labelColor;
                 aEl.style.borderColor = labelColor;
-                aEl.innerHTML = `<span style="padding:${LABEL_PADDING};cursor:pointer;" data-path="${aPath}">${aName}</span>`;
+                aEl.innerHTML = `<span style="padding:${LABEL_PADDING};cursor:pointer;" data-rec="label" data-path="${aPath}">${aName}</span>`;
                 aEl.addEventListener('wheel', (e) => { e.stopPropagation(); renderer.domElement.dispatchEvent(new WheelEvent('wheel', e)); }, { passive: false });
                 labelContainer.appendChild(aEl);
                 aEl.querySelector('span[data-path]').onclick = (e) => {
@@ -2617,6 +2683,7 @@ const updateCount = () => {
     if (localStorage.getItem('debug_show_stats') !== '1') stats.dom.style.display = 'none';
     window._statsInstances = window._statsInstances || [];
     window._statsInstances.push(stats.dom);
+    ac.signal.addEventListener('abort', () => { window._statsInstances = window._statsInstances.filter((d) => d !== stats.dom); });
 
     const resizeHandler = () => {
         const newAspect = container.clientWidth / container.clientHeight;
@@ -2629,11 +2696,12 @@ const updateCount = () => {
         }
     };
 
-    new ResizeObserver(() => resizeHandler()).observe(container);
+    const ro = new ResizeObserver(() => resizeHandler());
+    ro.observe(container);
             
 
 
-    const sceneData = { scene, renderer, camera, controls, animationId: null, resizeHandler, labelContainer, countDiv, stackGroups, ssBg };
+    const sceneData = { path: node.path, abort: ac, scene, renderer, camera, controls, animationId: null, resizeHandler, labelContainer, countDiv, stackGroups, ssBg };
 
     const frustum = new THREE.Frustum();
     const cameraViewProjectionMatrix = new THREE.Matrix4();
@@ -2650,10 +2718,11 @@ const updateCount = () => {
     const _worldBox = new THREE.Box3();
 
     function animate() {
-        stats.begin();
+        const statsOn = stats.dom.style.display !== 'none';
+        if (statsOn) stats.begin();
         sceneData.animationId = requestAnimationFrame(animate);
         controls.update();
-        const rotationAngle = Date.now() * ROTATION_SPEED;
+        const rotationAngle = rotClock() * ROTATION_SPEED;
         scene.rotation.y = rotationAngle;
         
         if (frameCount % 5 === 0) {
@@ -2676,11 +2745,11 @@ const updateCount = () => {
             const targetLod = viewHeight < spriteConfig.lod_viewheight_thresholds[0] ? 0 : viewHeight < spriteConfig.lod_viewheight_thresholds[1] ? 1 : 2;
             for (const mat of sceneMaterials) {
                 if (!mat._ssArray) continue;
-                const best = getBestLod(mat._ssArray, targetLod);
+                const best = mine(getBestLod(mat._ssArray, targetLod));
                 if (best && mat.map !== best) { mat.map = best; mat.needsUpdate = true; }
             }
             for (const ai of animInstances) {
-                const best = getBestLod(ai.ssArray, targetLod);
+                const best = mine(getBestLod(ai.ssArray, targetLod));
                 if (best && ai.mat.uniforms.map.value !== best) ai.mat.uniforms.map.value = best;
             }
         }
@@ -3019,7 +3088,7 @@ const updateCount = () => {
 
         frameCount++;
         renderer.render(scene, camera);
-        stats.end();
+        if (statsOn) stats.end();
     }
     animate();
 
@@ -3030,6 +3099,7 @@ const updateCount = () => {
         if (container.clientWidth > 0 && container.clientHeight > 0) resizeHandler();
     });
     _ro.observe(container);
+    ac.signal.addEventListener('abort', () => { ro.disconnect(); _ro.disconnect(); });
 
     await loadingPromise;
     return sceneData;
@@ -3145,6 +3215,7 @@ async function renderContent(node, page) {
     for (const child of children) {
         const div = document.createElement('div');
         div.className = 'content-div';
+        div.dataset.recDiv = child.path;
         let childWidth;
         if (asymmetric) {
             const isText = !child.ai.length && child.at.length;
@@ -3291,6 +3362,7 @@ scriptTags.forEach(oldScript => {
             if (hasParent) {
                 const backBtn = document.createElement('span');
                 backBtn.className = 'div-nav-back';
+                backBtn.dataset.rec = 'div-back';
                 backBtn.textContent = '<';
                 backBtn.onclick = (e) => {
                     e.stopPropagation();
@@ -3302,6 +3374,7 @@ scriptTags.forEach(oldScript => {
             if (canGoDeeper) {
                 const fwdBtn = document.createElement('span');
                 fwdBtn.className = 'div-nav-fwd';
+                fwdBtn.dataset.rec = 'div-fwd';
                 fwdBtn.textContent = '>';
                 fwdBtn.onclick = (e) => {
                     e.stopPropagation();
@@ -3326,6 +3399,7 @@ scriptTags.forEach(oldScript => {
         for (let i = 0; i < totalPages; i++) {
             const btn = document.createElement('span');
             btn.textContent = i + 1;
+            btn.dataset.rec = 'page';
             btn.style.cssText = `color:${i === currentPage ? '#ff3333' : '#ff333366'};font-size:64px;font-family:monospace;font-weight:bold;cursor:pointer;padding:4px 12px;`;
             btn.onmouseenter = () => btn.style.background = 'black';
             btn.onmouseleave = () => btn.style.background = 'transparent';
@@ -3345,6 +3419,353 @@ scriptTags.forEach(oldScript => {
     await Promise.all(scenePromises);
     return Promise.resolve();
 }
+(() => {
+    const HOVER = new Set(['tree-link', 'label']);
+    const KEYS = new Set(['Escape']);
+    const CAM_MS = 66, SCROLL_MS = 100, TWEEN_MAX = 400, IDLE_S = 5;
+    const CODES = {
+        R001: 'recording file invalid',
+        R002: 'unsupported recording version',
+        R003: 'path not found, step skipped',
+        R004: 'element not found, step skipped',
+    };
+
+    let state = 'idle';
+    let rec = null, t0 = 0, T = 0, idx = 0, last = 0, raf = 0;
+    let pending = 0, busy = false, dirty = false, idleTimer = 0, rotOff = 0;
+    let warns = 0, lastWarn = '', down = null, gen = 0;
+    const samp = new Map(), tweens = new Map(), nextOf = new WeakMap(), hooked = new WeakSet();
+
+    const r4 = (v) => Math.round(v * 1e4) / 1e4;
+    const lerp = (a, b, u) => a + (b - a) * u;
+    const isEl = (x) => x instanceof Element;
+
+    rotClock = () => (state === 'playing' && rec ? rec.t0 + T : Date.now() + rotOff);
+
+    const render0 = renderContent;
+    renderContent = function (node, page) {
+        const p = render0(node, page);
+        pending++;
+        if (state === 'recording') push({ a: 'at', path: currentNode?.path ?? null, page: currentPage });
+        const done = () => {
+            pending--;
+            hookScenes();
+            if (state === 'recording') push({ a: 'ready' });
+        };
+        p.then(done, done);
+        return p;
+    };
+
+    const sec = document.getElementById('debug-section');
+    const btn = 'cursor:pointer;border:1px solid #333;padding:0 5px;';
+    const panel = document.createElement('div');
+    panel.id = 'rec-panel';
+    panel.style.cssText = 'margin-top:6px;padding-top:6px;border-top:1px solid #333;';
+    panel.innerHTML = `
+        <div class="debug-row" style="cursor:default;flex-wrap:wrap;">
+            <span data-act="record" style="${btn}">rec</span>
+            <span data-act="save" style="${btn}">save</span>
+            <span data-act="load" style="${btn}">load</span>
+            <span data-act="play" style="${btn}">play</span>
+            <span data-act="stop" style="${btn}">stop</span>
+        </div>
+        <label class="debug-row"><input type="checkbox" id="rec-loop"> loop</label>
+        <label class="debug-row">idle <input type="number" id="rec-idle" value="${IDLE_S}" min="0" step="1" style="width:44px;background:transparent;color:inherit;border:1px solid #333;font:inherit;"> s</label>
+        <div id="rec-status" style="color:#666;word-break:break-all;max-width:280px;white-space:normal;"></div>
+        <input type="file" id="rec-file" accept=".json,application/json" style="display:none;">`;
+    sec.appendChild(panel);
+    const ui = {
+        rec: panel.querySelector('[data-act="record"]'),
+        play: panel.querySelector('[data-act="play"]'),
+        loop: panel.querySelector('#rec-loop'),
+        idle: panel.querySelector('#rec-idle'),
+        status: panel.querySelector('#rec-status'),
+        file: panel.querySelector('#rec-file'),
+    };
+    for (const id of ['nav-back', 'nav-fwd', 'tree-expand-all']) document.getElementById(id).dataset.rec = id;
+
+    const dur = () => rec.duration || (rec.events.length ? rec.events[rec.events.length - 1].t : 0);
+    const status = () => {
+        ui.rec.textContent = state === 'recording' ? 'stop rec' : 'rec';
+        ui.play.textContent = state === 'paused' ? 'resume' : state === 'playing' || state === 'auto' ? 'pause' : 'play';
+        let s = state;
+        if (state === 'recording') s += ` ${rec.events.length} ev`;
+        else if (rec) s += ` ${((state === 'idle' ? 0 : T) / 1000).toFixed(1)}/${(dur() / 1000).toFixed(1)}s (${rec.events.length} ev)`;
+        if (warns) s += ` | ${warns} warn: ${lastWarn}`;
+        if (ui.status.textContent !== s) ui.status.textContent = s;
+    };
+    const warn = (code, detail) => {
+        warns++;
+        lastWarn = `${code} ${CODES[code]}: ${detail}`;
+        console.warn('[REC] ' + lastWarn);
+        status();
+    };
+    const setState = (s) => {
+        if (state === 'playing' && s !== 'playing' && rec) rotOff = rec.t0 + T - Date.now();
+        state = s;
+        clearTimeout(idleTimer);
+        const run = s === 'playing' || s === 'auto' || s === 'paused';
+        if (run && !raf) { last = performance.now(); raf = requestAnimationFrame(tick); }
+        if (!run && raf) { cancelAnimationFrame(raf); raf = 0; }
+        status();
+    };
+
+    const pathOf = (el) => el.dataset.path ?? el.closest('[data-path]')?.dataset.path ?? null;
+    const scopeOf = (d) => (d == null ? document : [...document.querySelectorAll('[data-rec-div]')].find((x) => x.dataset.recDiv === d));
+    const cands = (k, p, d) => {
+        const s = scopeOf(d);
+        return s ? [...s.querySelectorAll(`[data-rec="${CSS.escape(k)}"]`)].filter((x) => pathOf(x) === p) : [];
+    };
+    const ref = (el) => {
+        const k = el.dataset.rec, p = pathOf(el), d = el.closest('[data-rec-div]')?.dataset.recDiv ?? null;
+        const o = { k };
+        if (p != null) o.p = p;
+        if (d != null) o.d = d;
+        const n = cands(k, p, d).indexOf(el);
+        if (n > 0) o.n = n;
+        return o;
+    };
+    const find = (e) => cands(e.k, e.p ?? null, e.d ?? null)[e.n || 0];
+
+    const push = (e) => { rec.events.push({ t: Math.round(performance.now() - t0), ...e }); status(); };
+    const sample = (key, make, ms) => {
+        const now = performance.now();
+        let s = samp.get(key);
+        if (!s) samp.set(key, (s = { last: -1e9, timer: 0 }));
+        clearTimeout(s.timer);
+        if (now - s.last >= ms) { s.last = now; push(make()); }
+        else s.timer = setTimeout(() => { if (state === 'recording') { s.last = performance.now(); push(make()); } }, ms);
+    };
+    const camOf = (s) => ({ a: 'cam', d: s.path, pos: s.camera.position.toArray().map(r4), tgt: s.controls.target.toArray().map(r4), zoom: r4(s.camera.zoom) });
+    const hookScenes = () => {
+        for (const s of activeScenes) {
+            if (hooked.has(s)) continue;
+            hooked.add(s);
+            s.controls.addEventListener('change', () => { if (state === 'recording') sample('cam:' + s.path, () => camOf(s), CAM_MS); });
+        }
+    };
+
+    document.addEventListener('pointerdown', (e) => { down = { x: e.clientX, y: e.clientY }; }, true);
+    document.addEventListener('click', (e) => {
+        if (state !== 'recording' || !isEl(e.target)) return;
+        const el = e.target.closest('[data-rec]');
+        if (el) return push({ a: 'click', ...ref(el) });
+        const d = e.target.closest('[data-rec-div]')?.dataset.recDiv;
+        if (d != null && e.target.tagName === 'CANVAS' && down && Math.hypot(e.clientX - down.x, e.clientY - down.y) <= 5) push({ a: 'reset', d });
+    }, true);
+    for (const type of ['mouseenter', 'mouseleave']) {
+        document.addEventListener(type, (e) => {
+            if (state !== 'recording' || !isEl(e.target) || !HOVER.has(e.target.dataset.rec)) return;
+            push({ a: type === 'mouseenter' ? 'enter' : 'leave', ...ref(e.target) });
+        }, true);
+    }
+    document.addEventListener('keydown', (e) => { if (state === 'recording' && KEYS.has(e.key)) push({ a: 'key', key: e.key }); }, true);
+    onSlicePin = (container, img) => {
+        if (state === 'recording') push({ a: 'pin', d: container.closest('[data-rec-div]')?.dataset.recDiv ?? null, img });
+    };
+    document.addEventListener('scroll', (e) => {
+        const el = e.target;
+        if (state !== 'recording' || !isEl(el) || !el.classList.contains('text-content')) return;
+        const d = el.closest('[data-rec-div]')?.dataset.recDiv;
+        if (d == null) return;
+        sample('scroll:' + d, () => {
+            const m = el.scrollHeight - el.clientHeight;
+            return { a: 'scroll', d, y: m > 0 ? r4(el.scrollTop / m) : 0 };
+        }, SCROLL_MS);
+    }, true);
+
+    const setCam = (e, f, u) => {
+        const s = activeScenes.find((x) => x.path === e.d);
+        if (!s) return;
+        const L = (k, i) => (f ? lerp(e[k][i], f[k][i], u) : e[k][i]);
+        s.camera.position.set(L('pos', 0), L('pos', 1), L('pos', 2));
+        s.controls.target.set(L('tgt', 0), L('tgt', 1), L('tgt', 2));
+        s.camera.zoom = f ? lerp(e.zoom, f.zoom, u) : e.zoom;
+        s.camera.updateProjectionMatrix();
+        s.controls.update();
+    };
+    const setScroll = (e, f, u) => {
+        const el = scopeOf(e.d)?.querySelector('.text-content');
+        if (el) el.scrollTop = (f ? lerp(e.y, f.y, u) : e.y) * (el.scrollHeight - el.clientHeight);
+    };
+    const clearHover = () => document.querySelectorAll('.tree-link.tree-hover').forEach((x) => x.classList.remove('tree-hover'));
+    const apply = (e) => {
+        if (e.a === 'cam' || e.a === 'scroll') {
+            (e.a === 'cam' ? setCam : setScroll)(e);
+            if (nextOf.has(e)) tweens.set(e.a + ':' + e.d, e);
+            else tweens.delete(e.a + ':' + e.d);
+            return;
+        }
+        if (e.a === 'reset') return void activeScenes.find((x) => x.path === e.d)?.resetAll?.();
+        if (e.a === 'key') return void document.dispatchEvent(new KeyboardEvent('keydown', { key: e.key }));
+        if (e.a === 'pin') {
+            if (!activeScenes.find((x) => x.path === e.d)?.ssBg?.pin(e.img ?? null)) warn('R004', `pin ${e.img}`);
+            return;
+        }
+        if (e.a !== 'click' && e.a !== 'enter' && e.a !== 'leave') return;
+        const el = find(e);
+        if (!el) return warn('R004', `${e.a} ${e.k} ${e.p ?? ''}`);
+        if (e.a === 'click') return el.click();
+        const on = e.a === 'enter';
+        el.dispatchEvent(new MouseEvent(on ? 'mouseenter' : 'mouseleave'));
+        if (e.k === 'tree-link') el.classList.toggle('tree-hover', on);
+    };
+    const runTweens = () => {
+        for (const e of tweens.values()) {
+            const f = nextOf.get(e);
+            if (T < f.t) (e.a === 'cam' ? setCam : setScroll)(e, f, (T - e.t) / (f.t - e.t));
+        }
+    };
+    const link = () => {
+        const lastOf = new Map();
+        for (const e of rec.events) {
+            if (e.a === 'at') lastOf.clear();
+            if (e.a !== 'cam' && e.a !== 'scroll') continue;
+            const key = e.a + ':' + e.d, p = lastOf.get(key);
+            if (p && e.t > p.t && e.t - p.t <= TWEEN_MAX) nextOf.set(p, e);
+            lastOf.set(key, e);
+        }
+    };
+
+    const goto = async (e, force) => {
+        const node = e.path == null || !dataTree ? null : findNodeByPath(dataTree, e.path);
+        if (!node) return warn('R003', e.path);
+        if (force || !currentNode || currentNode.path !== node.path) await renderContent(node);
+        const pg = e.page || 0;
+        if (pg !== currentPage && pg < Math.ceil(allFilteredChildren.length / getPageSize())) await renderContent(node, pg);
+    };
+    const seek = async (to) => {
+        tweens.clear();
+        clearHover();
+        const ev = rec.events;
+        let i0 = -1;
+        for (let i = 0; i < ev.length && ev[i].t <= to; i++) if (ev[i].a === 'at') i0 = i;
+        const g = ++gen;
+        idx = 0;
+        if (i0 >= 0) { await goto(ev[i0], true); idx = i0 + 1; }
+        if (g !== gen) return;
+        for (; idx < ev.length && ev[idx].t <= to; idx++) if (ev[idx].a !== 'at' && ev[idx].a !== 'ready') apply(ev[idx]);
+        T = to;
+    };
+    const hold = (p) => {
+        busy = true;
+        p.catch((err) => console.warn('[REC]', err)).finally(() => { busy = false; last = performance.now(); });
+    };
+    const tick = (now) => {
+        raf = requestAnimationFrame(tick);
+        if (state !== 'playing' || busy) { last = now; return; }
+        T += Math.min(now - last, 250);
+        last = now;
+        const ev = rec.events;
+        while (idx < ev.length && ev[idx].t <= T) {
+            const e = ev[idx];
+            if (e.a === 'ready' && pending > 0) { T = e.t; break; }
+            idx++;
+            if (e.a === 'at') {
+                if (e.path !== currentNode?.path || (e.page || 0) !== currentPage) { T = e.t; hold(goto(e)); break; }
+            } else if (e.a !== 'ready') apply(e);
+        }
+        runTweens();
+        status();
+        if (idx >= ev.length && !busy) {
+            if (ui.loop.checked) hold(seek(0));
+            else stop();
+        }
+    };
+
+    const resume = () => {
+        if (state !== 'auto' && state !== 'paused') return;
+        const d = dirty;
+        dirty = false;
+        setState('playing');
+        if (d) hold(seek(T));
+    };
+    const activity = (e) => {
+        if (!e.isTrusted || (state !== 'playing' && state !== 'auto' && state !== 'paused')) return;
+        if (e.type !== 'mousemove' && e.key !== 'd' && !(isEl(e.target) && e.target.closest('#debug-section'))) dirty = true;
+        if (state === 'paused') return;
+        if (state === 'playing') setState('auto');
+        clearTimeout(idleTimer);
+        idleTimer = setTimeout(resume, Math.max(0, parseFloat(ui.idle.value) || 0) * 1000);
+    };
+    for (const type of ['mousemove', 'pointerdown', 'wheel', 'keydown', 'touchstart']) window.addEventListener(type, activity, { capture: true, passive: true });
+
+    const stop = () => {
+        if (state === 'recording') {
+            rec.duration = Math.round(performance.now() - t0);
+            for (const s of samp.values()) clearTimeout(s.timer);
+        }
+        gen++;
+        tweens.clear();
+        clearHover();
+        setState('idle');
+    };
+    const actions = {
+        record() {
+            if (state === 'recording') return stop();
+            if (!currentNode) return;
+            stop();
+            rec = { version: 1, created: new Date().toISOString(), t0: rotClock(), viewport: [innerWidth, innerHeight], duration: 0, events: [] };
+            t0 = performance.now();
+            warns = 0;
+            samp.clear();
+            hookScenes();
+            setState('recording');
+            push({ a: 'at', path: currentNode.path, page: currentPage });
+            for (const s of activeScenes) push(camOf(s));
+            if (!pending) push({ a: 'ready' });
+        },
+        save() {
+            if (!rec || state === 'recording') return;
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(new Blob([JSON.stringify(rec)], { type: 'application/json' }));
+            a.download = 'recording_' + rec.created.replace(/[-:]/g, '').slice(0, 15) + '.json';
+            a.click();
+            URL.revokeObjectURL(a.href);
+        },
+        load() { ui.file.click(); },
+        play() {
+            if (!rec || !rec.events.length || state === 'recording') return;
+            if (state === 'paused') return resume();
+            if (state === 'playing' || state === 'auto') return setState('paused');
+            link();
+            warns = 0;
+            dirty = false;
+            setState('playing');
+            hold(seek(0));
+        },
+        stop,
+    };
+    panel.addEventListener('click', (e) => actions[e.target.dataset?.act]?.());
+    ui.file.addEventListener('change', async () => {
+        const file = ui.file.files[0];
+        ui.file.value = '';
+        if (!file) return;
+        try {
+            const j = JSON.parse(await file.text());
+            if (!j || !Array.isArray(j.events)) return warn('R001', file.name);
+            if (j.version !== 1) return warn('R002', `${file.name} version=${j.version}`);
+            const num = (v) => typeof v === 'number' && isFinite(v);
+            const v3 = (v) => Array.isArray(v) && v.length === 3 && v.every(num);
+            const ok = (e) => e && num(e.t) && typeof e.a === 'string'
+                && (e.a !== 'cam' || (v3(e.pos) && v3(e.tgt) && num(e.zoom)))
+                && (e.a !== 'scroll' || num(e.y))
+                && (!['click', 'enter', 'leave'].includes(e.a) || typeof e.k === 'string')
+                && (e.a !== 'pin' || e.img == null || typeof e.img === 'string');
+            const n = j.events.length;
+            j.events = j.events.filter(ok).sort((a, b) => a.t - b.t);
+            if (!num(j.t0)) j.t0 = Date.now();
+            stop();
+            rec = j;
+            warns = 0;
+            if (j.events.length < n) warn('R001', `${file.name}: ${n - j.events.length} invalid events dropped`);
+            status();
+        } catch (err) {
+            warn('R001', `${file.name}: ${err.message}`);
+        }
+    });
+    status();
+})();
 </script>
 </body>
 </html>
