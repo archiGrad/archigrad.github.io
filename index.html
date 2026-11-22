@@ -550,10 +550,20 @@ function rebaseHtmlSrc(html, htmlPath) {
     return html.replace(/(src\s*=\s*["'])(?!https?:\/\/|data:|\/|#)([^"']+)(["'])/gi, (m, pre, val, post) => pre + base + val + post);
 }
 
+function ytEmbed(html) {
+    return html.replace(/<iframe\b[^>]*>/gi, (tag) => {
+        const m = tag.match(/\bsrc\s*=\s*(["'])https?:\/\/(?:www\.)?(youtube(?:-nocookie)?\.com)\/embed\/([^"']*)\1/i);
+        if (!m || /enablejsapi=/.test(m[3])) return tag;
+        const src = `https://www.${m[2]}/embed/${m[3]}${m[3].includes('?') ? '&' : '?'}enablejsapi=1&playsinline=1`;
+        const t = tag.replace(m[0], `src=${m[1]}${src}${m[1]}`);
+        return /\ballow\s*=/i.test(t) ? t : t.replace(/^<iframe/i, '<iframe allow="autoplay; fullscreen"');
+    });
+}
+
 function assembleHtmlParts(parts, paths) {
     const total = parts.length;
     return parts.map((part, i) => {
-        const rebased = rebaseHtmlSrc(part, paths[i]);
+        const rebased = ytEmbed(rebaseHtmlSrc(part, paths[i]));
         const dot = (spriteConfig.show_nav_accessories && spriteConfig.colored_html_dots) ? `<span class="page-dot" style="color:${seededColorFromPath(paths[i])}">●</span>` : '';
         const pageLabel = total > 1 ? `<div class="page-label">${i+1}/${total}${dot}</div>` : '';
         const separator = i < total - 1 ? '<hr class="page-separator">' : '';
@@ -3422,34 +3432,41 @@ scriptTags.forEach(oldScript => {
 (() => {
     const HOVER = new Set(['tree-link', 'label']);
     const KEYS = new Set(['Escape']);
-    const CAM_MS = 66, SCROLL_MS = 100, TWEEN_MAX = 400, IDLE_S = 5;
+    const STATE = new Set(['cam', 'reset', 'scroll', 'pin', 'yt']);
+    const CAM_MS = 66, SCROLL_MS = 100, TWEEN_MAX = 400, IDLE_S = 5, DWELL_MS = 2000, YT_QUIET_MS = 1500;
+    const REC_DIR = 'recordings/';
+    const YT_RE = /youtube(?:-nocookie)?\.com\/embed\/([^?&#/"']+)/;
     const CODES = {
         R001: 'recording file invalid',
         R002: 'unsupported recording version',
         R003: 'path not found, step skipped',
         R004: 'element not found, step skipped',
+        R005: 'video not found or YouTube API unavailable',
     };
 
     let state = 'idle';
-    let rec = null, t0 = 0, T = 0, idx = 0, last = 0, raf = 0;
+    let rec = null, t0 = 0, T = 0, idx = 0, seg = 0, last = 0, raf = 0, flipAt = 0, want = -1;
     let pending = 0, busy = false, dirty = false, idleTimer = 0, rotOff = 0;
-    let warns = 0, lastWarn = '', down = null, gen = 0;
-    const samp = new Map(), tweens = new Map(), nextOf = new WeakMap(), hooked = new WeakSet();
+    let warns = 0, lastWarn = '', down = null, gen = 0, ytApi = null;
+    const samp = new Map(), tweens = new Map(), held = new Map(), nextOf = new WeakMap(), hooked = new WeakSet(), snaps = new WeakSet();
 
+    const r2 = (v) => Math.round(v * 100) / 100;
     const r4 = (v) => Math.round(v * 1e4) / 1e4;
     const lerp = (a, b, u) => a + (b - a) * u;
     const isEl = (x) => x instanceof Element;
 
     rotClock = () => (state === 'playing' && rec ? rec.t0 + T : Date.now() + rotOff);
 
+    const atEv = () => ({ a: 'at', path: currentNode?.path ?? null, page: currentPage, first: allFilteredChildren[currentPage * getPageSize()]?.path ?? null });
     const render0 = renderContent;
     renderContent = function (node, page) {
         const p = render0(node, page);
         pending++;
-        if (state === 'recording') push({ a: 'at', path: currentNode?.path ?? null, page: currentPage });
+        if (state === 'recording') push(atEv());
         const done = () => {
             pending--;
             hookScenes();
+            if (state !== 'idle') hookYt();
             if (state === 'recording') push({ a: 'ready' });
         };
         p.then(done, done);
@@ -3471,6 +3488,8 @@ scriptTags.forEach(oldScript => {
         </div>
         <label class="debug-row"><input type="checkbox" id="rec-loop"> loop</label>
         <label class="debug-row">idle <input type="number" id="rec-idle" value="${IDLE_S}" min="0" step="1" style="width:44px;background:transparent;color:inherit;border:1px solid #333;font:inherit;"> s</label>
+        <label class="debug-row">speed <input type="number" id="rec-speed" value="1" min="0.05" step="0.1" style="width:44px;background:transparent;color:inherit;border:1px solid #333;font:inherit;"> x</label>
+        <label class="debug-row" id="rec-list-row" style="display:none;">deployed <select id="rec-list" style="max-width:200px;background:#000;color:inherit;border:1px solid #333;font:inherit;"><option value="">-</option></select></label>
         <div id="rec-status" style="color:#666;word-break:break-all;max-width:280px;white-space:normal;"></div>
         <input type="file" id="rec-file" accept=".json,application/json" style="display:none;">`;
     sec.appendChild(panel);
@@ -3479,11 +3498,14 @@ scriptTags.forEach(oldScript => {
         play: panel.querySelector('[data-act="play"]'),
         loop: panel.querySelector('#rec-loop'),
         idle: panel.querySelector('#rec-idle'),
+        speed: panel.querySelector('#rec-speed'),
+        list: panel.querySelector('#rec-list'),
         status: panel.querySelector('#rec-status'),
         file: panel.querySelector('#rec-file'),
     };
     for (const id of ['nav-back', 'nav-fwd', 'tree-expand-all']) document.getElementById(id).dataset.rec = id;
 
+    const speed = () => { const v = parseFloat(ui.speed.value); return v > 0 ? v : 1; };
     const dur = () => rec.duration || (rec.events.length ? rec.events[rec.events.length - 1].t : 0);
     const status = () => {
         ui.rec.textContent = state === 'recording' ? 'stop rec' : 'rec';
@@ -3501,7 +3523,7 @@ scriptTags.forEach(oldScript => {
         status();
     };
     const setState = (s) => {
-        if (state === 'playing' && s !== 'playing' && rec) rotOff = rec.t0 + T - Date.now();
+        if (state === 'playing' && s !== 'playing' && rec) { rotOff = rec.t0 + T - Date.now(); ytHold(); }
         state = s;
         clearTimeout(idleTimer);
         const run = s === 'playing' || s === 'auto' || s === 'paused';
@@ -3563,6 +3585,43 @@ scriptTags.forEach(oldScript => {
     onSlicePin = (container, img) => {
         if (state === 'recording') push({ a: 'pin', d: container.closest('[data-rec-div]')?.dataset.recDiv ?? null, img });
     };
+    // Scroll anchor: the node at the top edge of the text pane, as a childNodes index path,
+    // plus how far into that node (fraction of its height). Same HTML on every device, so the
+    // same paragraph/image/video ends up at the top regardless of width or text reflow.
+    const nodeRect = (n) => {
+        if (n.nodeType === 1) return n.getBoundingClientRect();
+        const r = document.createRange();
+        r.selectNodeContents(n);
+        return r.getBoundingClientRect();
+    };
+    const anchorOf = (el) => {
+        if (el.scrollTop <= 0) return { el: [], f: 0 };
+        const y = el.getBoundingClientRect().top, path = [];
+        let node = el, f = 0;
+        for (;;) {
+            let i = 0, hit = null, r = null;
+            for (; i < node.childNodes.length; i++) {
+                const k = node.childNodes[i];
+                if (k.nodeType !== 1 && !(k.nodeType === 3 && k.textContent.trim())) continue;
+                r = nodeRect(k);
+                if (r.height && r.bottom > y) { hit = k; break; }
+            }
+            if (!hit) break;
+            path.push(i);
+            f = (y - r.top) / r.height;
+            if (f < 0 || hit.nodeType !== 1 || hit.tagName === 'IFRAME' || !hit.childNodes.length) break;
+            node = hit;
+        }
+        return { el: path, f: r4(f) };
+    };
+    const anchorPx = (el, e) => {
+        if (!Array.isArray(e.el)) return null;
+        let n = el;
+        for (const i of e.el) if (!(n = n.childNodes[i])) return null;
+        if (n === el) return 0;
+        const r = nodeRect(n);
+        return el.scrollTop + r.top + e.f * r.height - el.getBoundingClientRect().top;
+    };
     document.addEventListener('scroll', (e) => {
         const el = e.target;
         if (state !== 'recording' || !isEl(el) || !el.classList.contains('text-content')) return;
@@ -3570,9 +3629,111 @@ scriptTags.forEach(oldScript => {
         if (d == null) return;
         sample('scroll:' + d, () => {
             const m = el.scrollHeight - el.clientHeight;
-            return { a: 'scroll', d, y: m > 0 ? r4(el.scrollTop / m) : 0 };
+            return { a: 'scroll', d, y: m > 0 ? r4(el.scrollTop / m) : 0, ...anchorOf(el) };
         }, SCROLL_MS);
     }, true);
+
+    // YouTube: clicks inside the embed never reach this page, so videos are followed through the
+    // YouTube IFrame API (viewer.js adds enablejsapi=1 to embeds). Loaded only while recording or playing.
+    const ytVid = (f) => f.src.match(YT_RE)?.[1];
+    const ytFrames = (s) => (s ? [...s.querySelectorAll('.text-content iframe')].filter((f) => /enablejsapi=1/.test(f.src) && ytVid(f)) : []);
+    const ytScope = (d) => (d == null ? document : scopeOf(d));
+    const ytRef = (f) => {
+        const d = f.closest('[data-rec-div]')?.dataset.recDiv ?? null, v = ytVid(f);
+        const o = { d, v };
+        const n = ytFrames(ytScope(d)).filter((x) => ytVid(x) === v).indexOf(f);
+        if (n > 0) o.n = n;
+        return o;
+    };
+    const ytKey = (e) => `${e.d ?? null}:${e.v}:${e.n || 0}`;
+    const loadYt = () => ytApi || (ytApi = new Promise((res, rej) => {
+        if (window.YT?.Player) return res(window.YT);
+        const prev = window.onYouTubeIframeAPIReady;
+        window.onYouTubeIframeAPIReady = () => { prev?.(); res(window.YT); };
+        const s = document.createElement('script');
+        s.src = 'https://www.youtube.com/iframe_api';
+        s.onerror = () => { ytApi = null; s.remove(); rej(new Error('iframe_api not loaded')); };
+        document.head.appendChild(s);
+    }));
+    const hookYt = () => {
+        const fs = ytFrames(document).filter((f) => !f._yt);
+        if (!fs.length) return;
+        for (const f of fs) f._yt = true;
+        loadYt().then((YT) => {
+            for (const f of fs) {
+                if (!f.isConnected) continue;
+                new YT.Player(f, { events: {
+                    onReady: (ev) => {
+                        f._p = ev.target;
+                        if (!f._todo) return;
+                        if (state === 'playing') ytApply(f._todo, f);
+                        else { f._held = state !== 'idle'; f._todo = null; }
+                    },
+                    onStateChange: (ev) => ytState(f, ev.target, ev.data),
+                } });
+            }
+        }, (err) => { for (const f of fs) f._yt = false; warn('R005', err.message); });
+    };
+    const ytState = (f, p, code) => {
+        const s = code === 1 ? 'play' : code === 2 ? 'pause' : code === 0 ? 'end' : null;
+        if (!s) return;
+        if (state === 'recording') {
+            const at = r2(p.getCurrentTime()), now = performance.now(), l = f._last;
+            const exp = l && (l.s === 'play' ? l.at + (now - l.now) / 1000 : l.at);
+            if (!l || l.s !== s || Math.abs(exp - at) > 1) push({ a: 'yt', ...ytRef(f), s, at });
+            f._last = { s, at, now };
+            return;
+        }
+        if (s === 'play') f._began = true;
+        else f._user = false;
+        if (state === 'idle' || s === 'end' || f._want === s) return;
+        if (performance.now() < (f._quiet || 0) && (s === 'play' || !f._began)) return;
+        f._want = null;
+        if (s === 'play') f._user = true;
+        activity({ isTrusted: true, type: 'yt', target: f });
+    };
+    const ytApply = (e, f) => {
+        f = f || ytFrames(ytScope(e.d)).filter((x) => ytVid(x) === e.v)[e.n || 0];
+        if (!f) return warn('R005', `${e.v} not on page`);
+        if (!f._p) { f._todo = e; return hookYt(); }
+        f._todo = null;
+        f._held = false;
+        const p = f._p, play = e.s === 'play';
+        const at = play ? e.at + Math.max(0, T - e.t) / 1000 : e.at;
+        f._want = play ? 'play' : 'pause';
+        f._quiet = performance.now() + YT_QUIET_MS;
+        if (Math.abs(p.getCurrentTime() - at) > 1) p.seekTo(at, true);
+        if (!play) return p.pauseVideo();
+        f._began = false;
+        p.playVideo();
+        setTimeout(() => {
+            const ps = p.getPlayerState();
+            if (f._want !== 'play' || ps === 1 || ps === 3) return;
+            f._quiet = performance.now() + YT_QUIET_MS;
+            p.mute();
+            p.playVideo();
+        }, YT_QUIET_MS);
+    };
+    const ytHold = () => {
+        for (const f of ytFrames(document)) {
+            if (f._want !== 'play' || !f._p) continue;
+            f._want = 'pause';
+            f._quiet = performance.now() + YT_QUIET_MS;
+            f._held = true;
+            f._p.pauseVideo();
+        }
+    };
+    const ytResume = () => {
+        for (const f of ytFrames(document)) {
+            if (!f._held) continue;
+            f._held = false;
+            const k = ytKey(ytRef(f));
+            for (let i = idx - 1; i >= seg; i--) {
+                const e = rec.events[i];
+                if (e.a === 'yt' && ytKey(e) === k) { ytApply(e, f); break; }
+            }
+        }
+    };
 
     const setCam = (e, f, u) => {
         const s = activeScenes.find((x) => x.path === e.d);
@@ -3584,9 +3745,12 @@ scriptTags.forEach(oldScript => {
         s.camera.updateProjectionMatrix();
         s.controls.update();
     };
+    const scrollPx = (el, e) => anchorPx(el, e) ?? e.y * (el.scrollHeight - el.clientHeight);
     const setScroll = (e, f, u) => {
         const el = scopeOf(e.d)?.querySelector('.text-content');
-        if (el) el.scrollTop = (f ? lerp(e.y, f.y, u) : e.y) * (el.scrollHeight - el.clientHeight);
+        if (!el) return;
+        el.scrollTop = f ? lerp(scrollPx(el, e), scrollPx(el, f), u) : scrollPx(el, e);
+        held.set(e.d, { el, e, f, u, h: el.scrollHeight });
     };
     const clearHover = () => document.querySelectorAll('.tree-link.tree-hover').forEach((x) => x.classList.remove('tree-hover'));
     const apply = (e) => {
@@ -3602,6 +3766,8 @@ scriptTags.forEach(oldScript => {
             if (!activeScenes.find((x) => x.path === e.d)?.ssBg?.pin(e.img ?? null)) warn('R004', `pin ${e.img}`);
             return;
         }
+        if (e.a === 'yt') return ytApply(e);
+        if (e.a === 'click' && e.k === 'page') return;
         if (e.a !== 'click' && e.a !== 'enter' && e.a !== 'leave') return;
         const el = find(e);
         if (!el) return warn('R004', `${e.a} ${e.k} ${e.p ?? ''}`);
@@ -3618,8 +3784,11 @@ scriptTags.forEach(oldScript => {
     };
     const link = () => {
         const lastOf = new Map();
+        let atT = null;
         for (const e of rec.events) {
-            if (e.a === 'at') lastOf.clear();
+            if (e.a === 'at') { lastOf.clear(); atT = e.t; continue; }
+            if (e.a === 'cam' && atT !== null && e.t - atT < 50) snaps.add(e);
+            else atT = null;
             if (e.a !== 'cam' && e.a !== 'scroll') continue;
             const key = e.a + ':' + e.d, p = lastOf.get(key);
             if (p && e.t > p.t && e.t - p.t <= TWEEN_MAX) nextOf.set(p, e);
@@ -3627,25 +3796,78 @@ scriptTags.forEach(oldScript => {
         }
     };
 
+    // Pages hold 16 items on desktop, 6 on phones. A recorded page is replayed as the page that
+    // contains its first item. An action on an item that is not on screen switches to that item's
+    // page; within DWELL_MS of the last switch the switch waits until DWELL_MS has passed. Steps on
+    // hidden items are skipped and their latest state is restored when the item is shown.
+    const isAction = (e) => e.a === 'click' || e.a === 'scroll' || e.a === 'pin' || e.a === 'reset' || e.a === 'yt' || (e.a === 'cam' && !snaps.has(e));
+    const pageCount = () => Math.max(1, Math.ceil(allFilteredChildren.length / getPageSize()));
+    const pageFor = (e) => {
+        const i = e.first == null ? -1 : allFilteredChildren.findIndex((c) => c.path === e.first);
+        return Math.min(i >= 0 ? Math.floor(i / getPageSize()) : e.page || 0, pageCount() - 1);
+    };
+    const away = (e) => {
+        if (e.d == null || scopeOf(e.d)) return -1;
+        const i = allFilteredChildren.findIndex((c) => c.path === e.d);
+        const pg = i < 0 ? -1 : Math.floor(i / getPageSize());
+        return pg === currentPage ? -1 : pg;
+    };
+    const restore = () => {
+        const lastOf = new Map();
+        for (let i = seg; i < idx; i++) {
+            const e = rec.events[i];
+            if (STATE.has(e.a) && e.d != null && scopeOf(e.d)) lastOf.set(`${e.a === 'reset' ? 'cam' : e.a}:${e.a === 'yt' ? ytKey(e) : e.d}`, e);
+        }
+        for (const e of lastOf.values()) apply(e);
+    };
+    const flip = async (pg) => {
+        const g = gen;
+        await renderContent(currentNode, pg);
+        if (g !== gen) return;
+        restore();
+        flipAt = performance.now();
+    };
     const goto = async (e, force) => {
         const node = e.path == null || !dataTree ? null : findNodeByPath(dataTree, e.path);
         if (!node) return warn('R003', e.path);
         if (force || !currentNode || currentNode.path !== node.path) await renderContent(node);
-        const pg = e.page || 0;
-        if (pg !== currentPage && pg < Math.ceil(allFilteredChildren.length / getPageSize())) await renderContent(node, pg);
+        const pg = pageFor(e);
+        if (pg !== currentPage) await renderContent(node, pg);
+        flipAt = performance.now();
     };
     const seek = async (to) => {
         tweens.clear();
+        held.clear();
         clearHover();
         const ev = rec.events;
         let i0 = -1;
         for (let i = 0; i < ev.length && ev[i].t <= to; i++) if (ev[i].a === 'at') i0 = i;
         const g = ++gen;
-        idx = 0;
-        if (i0 >= 0) { await goto(ev[i0], true); idx = i0 + 1; }
+        idx = seg = i0 + 1;
+        want = -1;
+        if (i0 >= 0) await goto(ev[i0], true);
         if (g !== gen) return;
-        for (; idx < ev.length && ev[idx].t <= to; idx++) if (ev[idx].a !== 'at' && ev[idx].a !== 'ready') apply(ev[idx]);
+        let end = idx;
+        while (end < ev.length && ev[end].t <= to) end++;
+        for (let i = end - 1; i >= idx; i--) {
+            if (!isAction(ev[i]) || ev[i].d == null) continue;
+            const pg = away(ev[i]);
+            if (pg >= 0) {
+                await renderContent(currentNode, pg);
+                if (g !== gen) return;
+                flipAt = performance.now();
+            }
+            break;
+        }
+        const yts = new Map();
+        for (; idx < end; idx++) {
+            const e = ev[idx];
+            if (e.a === 'at' || e.a === 'ready' || away(e) >= 0) continue;
+            if (e.a === 'yt') yts.set(ytKey(e), e);
+            else apply(e);
+        }
         T = to;
+        for (const e of yts.values()) apply(e);
     };
     const hold = (p) => {
         busy = true;
@@ -3654,18 +3876,38 @@ scriptTags.forEach(oldScript => {
     const tick = (now) => {
         raf = requestAnimationFrame(tick);
         if (state !== 'playing' || busy) { last = now; return; }
-        T += Math.min(now - last, 250);
+        T += Math.min(now - last, 250) * speed();
         last = now;
         const ev = rec.events;
         while (idx < ev.length && ev[idx].t <= T) {
             const e = ev[idx];
             if (e.a === 'ready' && pending > 0) { T = e.t; break; }
+            const pg = e.a === 'at' ? -1 : away(e);
+            if (pg >= 0) {
+                if (isAction(e)) {
+                    if (now - flipAt >= DWELL_MS) { want = -1; T = e.t; hold(flip(pg)); break; }
+                    want = pg;
+                }
+                idx++;
+                continue;
+            }
             idx++;
+            if (e.d != null && isAction(e)) want = -1;
             if (e.a === 'at') {
-                if (e.path !== currentNode?.path || (e.page || 0) !== currentPage) { T = e.t; hold(goto(e)); break; }
+                seg = idx;
+                want = -1;
+                if (e.path !== currentNode?.path || pageFor(e) !== currentPage) { T = e.t; hold(goto(e)); break; }
             } else if (e.a !== 'ready') apply(e);
         }
+        if (!busy && want >= 0 && now - flipAt >= DWELL_MS) {
+            if (want !== currentPage) hold(flip(want));
+            want = -1;
+        }
         runTweens();
+        for (const [d, s] of held) {
+            if (!s.el.isConnected) held.delete(d);
+            else if (s.el.scrollHeight !== s.h) setScroll(s.e, s.f, s.u);
+        }
         status();
         if (idx >= ev.length && !busy) {
             if (ui.loop.checked) hold(seek(0));
@@ -3679,6 +3921,12 @@ scriptTags.forEach(oldScript => {
         dirty = false;
         setState('playing');
         if (d) hold(seek(T));
+        else ytResume();
+    };
+    const idleMs = () => Math.max(0, parseFloat(ui.idle.value) || 0) * 1000;
+    const autoResume = () => {
+        if (ytFrames(document).some((f) => f._user)) idleTimer = setTimeout(autoResume, idleMs());
+        else resume();
     };
     const activity = (e) => {
         if (!e.isTrusted || (state !== 'playing' && state !== 'auto' && state !== 'paused')) return;
@@ -3686,9 +3934,10 @@ scriptTags.forEach(oldScript => {
         if (state === 'paused') return;
         if (state === 'playing') setState('auto');
         clearTimeout(idleTimer);
-        idleTimer = setTimeout(resume, Math.max(0, parseFloat(ui.idle.value) || 0) * 1000);
+        idleTimer = setTimeout(autoResume, idleMs());
     };
     for (const type of ['mousemove', 'pointerdown', 'wheel', 'keydown', 'touchstart']) window.addEventListener(type, activity, { capture: true, passive: true });
+    window.addEventListener('blur', (e) => { if (document.activeElement?.tagName === 'IFRAME') activity(e); });
 
     const stop = () => {
         if (state === 'recording') {
@@ -3697,6 +3946,7 @@ scriptTags.forEach(oldScript => {
         }
         gen++;
         tweens.clear();
+        held.clear();
         clearHover();
         setState('idle');
     };
@@ -3711,9 +3961,11 @@ scriptTags.forEach(oldScript => {
             samp.clear();
             hookScenes();
             setState('recording');
-            push({ a: 'at', path: currentNode.path, page: currentPage });
+            push(atEv());
             for (const s of activeScenes) push(camOf(s));
             if (!pending) push({ a: 'ready' });
+            for (const f of ytFrames(document)) f._last = null;
+            hookYt();
         },
         save() {
             if (!rec || state === 'recording') return;
@@ -3737,19 +3989,18 @@ scriptTags.forEach(oldScript => {
         stop,
     };
     panel.addEventListener('click', (e) => actions[e.target.dataset?.act]?.());
-    ui.file.addEventListener('change', async () => {
-        const file = ui.file.files[0];
-        ui.file.value = '';
-        if (!file) return;
+    const loadRec = (text, name) => {
         try {
-            const j = JSON.parse(await file.text());
-            if (!j || !Array.isArray(j.events)) return warn('R001', file.name);
-            if (j.version !== 1) return warn('R002', `${file.name} version=${j.version}`);
+            const j = JSON.parse(text);
+            if (!j || !Array.isArray(j.events)) return warn('R001', name);
+            if (j.version !== 1) return warn('R002', `${name} version=${j.version}`);
             const num = (v) => typeof v === 'number' && isFinite(v);
             const v3 = (v) => Array.isArray(v) && v.length === 3 && v.every(num);
+            const ints = (v) => Array.isArray(v) && v.every((x) => Number.isInteger(x) && x >= 0);
             const ok = (e) => e && num(e.t) && typeof e.a === 'string'
                 && (e.a !== 'cam' || (v3(e.pos) && v3(e.tgt) && num(e.zoom)))
-                && (e.a !== 'scroll' || num(e.y))
+                && (e.a !== 'scroll' || (num(e.y) && (e.el === undefined || (ints(e.el) && num(e.f)))))
+                && (e.a !== 'yt' || (typeof e.v === 'string' && ['play', 'pause', 'end'].includes(e.s) && num(e.at)))
                 && (!['click', 'enter', 'leave'].includes(e.a) || typeof e.k === 'string')
                 && (e.a !== 'pin' || e.img == null || typeof e.img === 'string');
             const n = j.events.length;
@@ -3758,10 +4009,43 @@ scriptTags.forEach(oldScript => {
             stop();
             rec = j;
             warns = 0;
-            if (j.events.length < n) warn('R001', `${file.name}: ${n - j.events.length} invalid events dropped`);
+            if (j.events.length < n) warn('R001', `${name}: ${n - j.events.length} invalid events dropped`);
             status();
         } catch (err) {
-            warn('R001', `${file.name}: ${err.message}`);
+            warn('R001', `${name}: ${err.message}`);
+        }
+    };
+    ui.file.addEventListener('change', async () => {
+        const file = ui.file.files[0];
+        ui.file.value = '';
+        if (!file) return;
+        ui.list.value = '';
+        loadRec(await file.text(), file.name);
+    });
+
+    // recordings/index.json is written by batch_ui.py at deploy: a list of the recording
+    // files deployed with the site. It fills the "deployed" dropdown; picking an entry
+    // loads recordings/<file> exactly like the file picker. No index -> no dropdown.
+    fetch(REC_DIR + 'index.json').then((r) => (r.ok ? r.json() : null)).then((idx) => {
+        const list = idx && Array.isArray(idx.recordings) ? idx.recordings : [];
+        for (const e of list) {
+            if (typeof e.file !== 'string') continue;
+            const o = document.createElement('option');
+            o.value = e.file;
+            o.textContent = `${e.file.replace(/\.json$/, '')} (${((e.duration || 0) / 1000).toFixed(1)}s)`;
+            ui.list.appendChild(o);
+        }
+        if (ui.list.options.length > 1) panel.querySelector('#rec-list-row').style.display = '';
+    }).catch(() => {});
+    ui.list.addEventListener('change', async () => {
+        const f = ui.list.value;
+        if (!f) return;
+        try {
+            const r = await fetch(REC_DIR + encodeURIComponent(f));
+            if (!r.ok) return warn('R001', `${f}: HTTP ${r.status}`);
+            loadRec(await r.text(), f);
+        } catch (err) {
+            warn('R001', `${f}: ${err.message}`);
         }
     });
     status();
