@@ -1,0 +1,70 @@
+<h2>HyROPA: batches</h2>
+<br><br>
+<details>
+<summary>global parms</summary>
+<pre>
+target spark, use_gpu on,
+quality: max_depth 8,
+samples 3e6,
+max_paths_per_tx 1e5,
+seed 42,
+los + specular_reflection + refraction + diffraction on, diffuse_reflection off,
+cfr_points 0,
+no measure surface,
+band lora_915 (915 MHz),
+antenna preset iso_reference (tx iso V, rx iso V),
+sensors role tx (power_dbm 14),
+1 sensor per plant 1 cm from stem, leaf or tray, sensor_seed 1,
+
+no moisture attribute: leaf use the library default (80 %)
+</pre>
+</details>
+
+<details>
+<summary>batch_01</summary>
+<pre>
+batch 1: x = growth stage, y = species, 20 work items
+[stage 0, strawberry] [stage 1, strawberry] [stage 2, strawberry] [stage 3, strawberry] [stage 4, strawberry]
+[stage 0, basil]      [stage 1, basil]      [stage 2, basil]      [stage 3, basil]      [stage 4, basil]
+[stage 0, salad]      [stage 1, salad]      [stage 2, salad]      [stage 3, salad]      [stage 4, salad]
+[stage 0, tomato]     [stage 1, tomato]     [stage 2, tomato]     [stage 3, tomato]     [stage 4, tomato]
+</pre>
+</details>
+
+<details>
+<summary>batch_02</summary>
+<pre>
+batch 2: x = growth stage, y = frequency, 20 work items, tomato only
+Null: frequency = @frequency
+[stage 0, 868 MHz]   [stage 1, 868 MHz]   [stage 2, 868 MHz]   [stage 3, 868 MHz]   [stage 4, 868 MHz]
+[stage 0, 915 MHz]   [stage 1, 915 MHz]   [stage 2, 915 MHz]   [stage 3, 915 MHz]   [stage 4, 915 MHz]
+[stage 0, 2.437 GHz] [stage 1, 2.437 GHz] [stage 2, 2.437 GHz] [stage 3, 2.437 GHz] [stage 4, 2.437 GHz]
+[stage 0, 5.18 GHz]  [stage 1, 5.18 GHz]  [stage 2, 5.18 GHz]  [stage 3, 5.18 GHz]  [stage 4, 5.18 GHz]
+</pre>
+</details>
+
+<details>
+<summary>batch_03</summary>
+<pre>
+batch 3: x = access point density, y = growth stage, 20 work items, tomato only
+AP wrangle: 1 AP per @area_per_ap m2 (instead of the fixed 100); room 5.8 x 5.8 m = 33.6 m2
+[stage 0, 1 AP per 34 m2] [stage 0, 1 AP per 17 m2] [stage 0, 1 AP per 8 m2] [stage 0, 1 AP per 5 m2]
+[stage 1, 1 AP per 34 m2] [stage 1, 1 AP per 17 m2] [stage 1, 1 AP per 8 m2] [stage 1, 1 AP per 5 m2]
+[stage 2, 1 AP per 34 m2] [stage 2, 1 AP per 17 m2] [stage 2, 1 AP per 8 m2] [stage 2, 1 AP per 5 m2]
+[stage 3, 1 AP per 34 m2] [stage 3, 1 AP per 17 m2] [stage 3, 1 AP per 8 m2] [stage 3, 1 AP per 5 m2]
+[stage 4, 1 AP per 34 m2] [stage 4, 1 AP per 17 m2] [stage 4, 1 AP per 8 m2] [stage 4, 1 AP per 5 m2]
+(= 1 / 2 / 4 / 7 access points)
+</pre>
+</details>
+
+<details>
+<summary>batch_04</summary>
+<pre>
+batch 4: x = moisture, y = growth stage, 20 work items, tomato only
+[stage 0, moisture 20] [stage 0, moisture 50] [stage 0, moisture 70] [stage 0, moisture 90]
+[stage 1, moisture 20] [stage 1, moisture 50] [stage 1, moisture 70] [stage 1, moisture 90]
+[stage 2, moisture 20] [stage 2, moisture 50] [stage 2, moisture 70] [stage 2, moisture 90]
+[stage 3, moisture 20] [stage 3, moisture 50] [stage 3, moisture 70] [stage 3, moisture 90]
+[stage 4, moisture 20] [stage 4, moisture 50] [stage 4, moisture 70] [stage 4, moisture 90]
+</pre>
+</details>
